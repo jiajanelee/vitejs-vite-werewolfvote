@@ -43,34 +43,40 @@ async function saveRoom(room) {
 
 // ── Role catalogue ────────────────────────────────────────────────────────
 const ROLE_MAP = {
-  wolf:      { id:"wolf",      label:"狼人",     emoji:"🐺", camp:"wolf" },
-  wolf2:     { id:"wolf2",     label:"狼王",     emoji:"👑", camp:"wolf" },
-  seer:      { id:"seer",      label:"預言家",   emoji:"🔮", camp:"good" },
-  witch:     { id:"witch",     label:"女巫",     emoji:"🧙", camp:"good" },
-  hunter:    { id:"hunter",    label:"獵人",     emoji:"🏹", camp:"good" },
-  guard:     { id:"guard",     label:"守衛",     emoji:"🛡", camp:"good" },
-  magician:  { id:"magician",  label:"魔術師",   emoji:"🎩", camp:"good" },
-  merchant:  { id:"merchant",  label:"奇蹟商人", emoji:"🛒", camp:"good" },
-  secretlove:{ id:"secretlove",label:"暗戀者",   emoji:"💘", camp:"good" },
-  dreamer:   { id:"dreamer",   label:"攝夢人",   emoji:"🌙", camp:"good" },
-  lonegirl:  { id:"lonegirl",  label:"覺醒孤獨少女", emoji:"🌟", camp:"good" },
-  lucky:     { id:"lucky",     label:"幸運兒",   emoji:"🍀", camp:"good" },
-  village:   { id:"village",   label:"村民",     emoji:"👤", camp:"good" },
+  wolf:       { id:"wolf",       label:"狼人",     emoji:"🐺", camp:"wolf" },
+  wolf2:      { id:"wolf2",      label:"狼王",     emoji:"👑", camp:"wolf" },
+  mechawolf:  { id:"mechawolf",  label:"機械狼",   emoji:"🤖", camp:"wolf" },
+  seer:       { id:"seer",       label:"預言家",   emoji:"🔮", camp:"good" },
+  spiritist:  { id:"spiritist",  label:"通靈師",   emoji:"👁", camp:"good" },
+  witch:      { id:"witch",      label:"女巫",     emoji:"🧙", camp:"good" },
+  hunter:     { id:"hunter",     label:"獵人",     emoji:"🏹", camp:"good" },
+  guard:      { id:"guard",      label:"守衛",     emoji:"🛡", camp:"good" },
+  magician:   { id:"magician",   label:"魔術師",   emoji:"🎩", camp:"good" },
+  merchant:   { id:"merchant",   label:"奇蹟商人", emoji:"🛒", camp:"good" },
+  secretlove: { id:"secretlove", label:"暗戀者",   emoji:"💘", camp:"good" },
+  dreamer:    { id:"dreamer",    label:"攝夢人",   emoji:"🌙", camp:"good" },
+  lonegirl:   { id:"lonegirl",   label:"覺醒孤獨少女", emoji:"🌟", camp:"good" },
+  lucky:      { id:"lucky",      label:"幸運兒",   emoji:"🍀", camp:"good" },
+  idiot:      { id:"idiot",      label:"白癡",     emoji:"🃏", camp:"good" },
+  village:    { id:"village",    label:"村民",     emoji:"👤", camp:"good" },
 };
 const ROLE_COLORS = {
-  wolf:      { bg:"var(--color-background-danger)",   text:"var(--color-text-danger)"   },
-  wolf2:     { bg:"var(--color-background-danger)",   text:"var(--color-text-danger)"   },
-  seer:      { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
-  witch:     { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
-  hunter:    { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
-  guard:     { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
-  magician:  { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
-  merchant:  { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
-  secretlove:{ bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
-  dreamer:   { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
-  lonegirl:  { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
-  lucky:     { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
-  village:   { bg:"var(--color-background-tertiary)", text:"var(--color-text-tertiary)" },
+  wolf:       { bg:"var(--color-background-danger)",   text:"var(--color-text-danger)"   },
+  wolf2:      { bg:"var(--color-background-danger)",   text:"var(--color-text-danger)"   },
+  mechawolf:  { bg:"var(--color-background-danger)",   text:"var(--color-text-danger)"   },
+  seer:       { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
+  spiritist:  { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
+  witch:      { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
+  hunter:     { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
+  guard:      { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
+  magician:   { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
+  merchant:   { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
+  secretlove: { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
+  dreamer:    { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
+  lonegirl:   { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
+  lucky:      { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
+  idiot:      { bg:"var(--color-background-secondary)",text:"var(--color-text-secondary)"},
+  village:    { bg:"var(--color-background-tertiary)", text:"var(--color-text-tertiary)" },
 };
 
 // ── Presets ───────────────────────────────────────────────────────────────
@@ -170,6 +176,47 @@ const PRESETS = [
         action:{ key:"check", label:"請選擇查驗目標", multi:false } },
       { roleId:"hunter",    label:"獵人睜眼（確認開槍狀態）", identifyPlayers:false,
         note:"首夜確認獵人是否開槍", action:null },
+    ],
+  },
+  {
+    id:"mechawolf_spiritist", label:"機械狼通靈師",
+    desc:"機械狼 狼人×3 通靈師 女巫 守衛 獵人 村民×4",
+    roles:["mechawolf","wolf","wolf","wolf","spiritist","witch","guard","hunter","village","village","village","village"],
+    // 首夜行動順序
+    nightOrder:[
+      { roleId:"hunter",    label:"獵人確認身分（首夜）", identifyPlayers:true,  firstNightOnly:true, action:null },
+      { roleId:"mechawolf", label:"機械狼選擇模仿對象",   identifyPlayers:true,
+        note:"機械狼不與小狼見面，獨立睜眼",
+        action:{ key:"mimic", label:"請選擇模仿對象", multi:false, isMimic:true } },
+      { roleId:"guard",     label:"守衛睜眼",             identifyPlayers:true,
+        action:{ key:"guard", label:"請選擇守護目標", multi:false, isGuard:true } },
+      { roleId:"wolf",      label:"狼人睜眼（不含機械狼）", identifyPlayers:true,
+        action:{ key:"kill", label:"請選擇殺人目標", multi:false } },
+      { roleId:"witch",     label:"女巫睜眼",             identifyPlayers:true,
+        action:{ key:"witch", label:"女巫行動", multi:false, isWitch:true } },
+      { roleId:"spiritist", label:"通靈師查驗",           identifyPlayers:true,
+        note:"查驗可得知具體身分；查到機械狼則顯示模仿對象身分",
+        action:{ key:"spiritCheck", label:"請選擇查驗目標", multi:false, isSpiritist:true } },
+      { roleId:"mechawolf", label:"機械狼確認模仿到的身分", identifyPlayers:false,
+        note:"上帝告知機械狼模仿到的具體身分",
+        action:{ key:"mimicReveal", label:"確認模仿身分結果（記錄用）", multi:false, isMimicReveal:true } },
+      { roleId:"hunter",    label:"獵人確認開槍狀態",     identifyPlayers:false, action:null },
+    ],
+    // 第二夜後的行動順序（在 buildOrder 中動態替換）
+    nightOrderLater:[
+      { roleId:"guard",     label:"守衛睜眼",             identifyPlayers:false,
+        action:{ key:"guard", label:"請選擇守護目標", multi:false, isGuard:true } },
+      { roleId:"mechawolf", label:"機械狼技能狀態",        identifyPlayers:false,
+        note:"模仿到神職或狼人獲得對應技能；帶刀狀態：所有狼人出局後獲得擊殺能力",
+        action:{ key:"mechaAction", label:"機械狼行動選擇", multi:false, isMechaAction:true } },
+      { roleId:"wolf",      label:"狼人睜眼",             identifyPlayers:false,
+        action:{ key:"kill", label:"請選擇殺人目標", multi:false } },
+      { roleId:"witch",     label:"女巫睜眼",             identifyPlayers:false,
+        action:{ key:"witch", label:"女巫行動", multi:false, isWitch:true } },
+      { roleId:"spiritist", label:"通靈師查驗",           identifyPlayers:false,
+        note:"查驗可得知具體身分；查到機械狼則顯示模仿對象身分",
+        action:{ key:"spiritCheck", label:"請選擇查驗目標", multi:false, isSpiritist:true } },
+      { roleId:"hunter",    label:"獵人確認開槍狀態",     identifyPlayers:false, action:null },
     ],
   },
 ];
@@ -818,7 +865,11 @@ function GodNightPanel({ room, godAction, loading }) {
 
   // Build effective night order with lonegirl inherited role injected
   const buildOrder = () => {
-    let base = fullOrder.filter(s=>isFirstNight||!s.firstNightOnly);
+    // For mechawolf preset: use nightOrderLater on night 2+
+    const baseOrder = (!isFirstNight && preset.nightOrderLater)
+      ? preset.nightOrderLater
+      : preset.nightOrder.filter(s=>isFirstNight||!s.firstNightOnly);
+    let base = [...baseOrder];
     if (!isFirstNight && room.lonegirlTransformed && room.lonegirlNewRole) {
       const inherited = room.lonegirlNewRole;
       const stepMap = {
@@ -875,19 +926,30 @@ function GodNightPanel({ room, godAction, loading }) {
     const stepData = {};
     if (act?.isWitch) {
       const choice = na.witchChoice;
-      // witchSave will be auto-filled below (wolfKill); poison target from witchTarget
+      if (choice==="save")   stepData.witchSave   = wolfKill ? [wolfKill] : [];
       if (choice==="poison") stepData.witchPoison = na.witchTarget||[];
     } else if (act?.isSwap) {
       stepData.swap = na.swap||[];
     } else if (act?.isGrant) {
       stepData.grant      = na.grant||[];
       stepData.grantSkill = na.grantSkill_choice ? [na.grantSkill_choice] : [];
+    } else if (act?.isSpiritist) {
+      stepData.spiritCheck = na.spiritCheck||[];
+    } else if (act?.isMimic) {
+      stepData.mimic = na.mimic||[];
+    } else if (act?.isMimicReveal) {
+      // Confirmation step only
+    } else if (act?.isMechaAction) {
+      stepData.mechaAction = na.mechaAction ? [na.mechaAction] : [];
+      if (na.mechaAction==="skill" && na.mechaWitchChoice==="save")   stepData.witchSave   = wolfKill ? [wolfKill] : [];
+      if (na.mechaAction==="skill" && na.mechaWitchChoice==="poison") stepData.witchPoison = na.mechaWitchTarget||[];
     } else if (act) {
       stepData[act.key] = na[act.key]||[];
     }
+
     if (dreamerNums.length) stepData.dreamerNum = dreamerNums[0];
 
-    // Lucky wolf check: save for resolveNight
+    // Lucky wolf check
     if (currentStep?.roleId==="lucky") {
       const luckyNum  = room.night?.grant?.[0] || null;
       const luckyRole = luckyNum ? room.roles?.[`p${luckyNum}`] : null;
@@ -895,30 +957,17 @@ function GodNightPanel({ room, godAction, loading }) {
       stepData.merchantNum  = roleOwners("merchant")[0] || null;
     }
 
-    // First night: save identity for each role separately
+    // First night: identify players
     const role = ROLE_MAP[step?.roleId];
     const isWolfCamp = role?.camp === "wolf";
     const roleIdToSave = isFirstNight ? step?.roleId : null;
-
-    // For wolf-camp: wolf2 and wolf are entered in separate NightPickBtns
-    // saveNightStep only handles one roleId+nums pair, so we call it twice for wolf steps
-    // by embedding both into stepData as special keys for the action handler
-    // Collect identity nums for this step's roleId
-    // For wolf-camp: each sub-role (wolf2, wolf) has its own key
     const identifyNums = isFirstNight ? (na[`id_${step?.roleId}`]||[]) : [];
-    // For wolf steps, also save the other wolf sub-role nums via stepData
     if (isFirstNight && isWolfCamp) {
       stepData._wolfIdentify = {
         wolf2: na["id_wolf2"]||[],
         wolf:  na["id_wolf"]||[],
+        mechawolf: na["id_mechawolf"]||[],
       };
-    }
-
-    // Also save witch save auto-fill: if save chosen, target = wolfKill
-    if (act?.isWitch) {
-      const choice = na.witchChoice;
-      if (choice==="save") stepData.witchSave = wolfKill ? [wolfKill] : [];
-      // poison already handled above
     }
 
     const nextStep = stepIdx+1;
@@ -1074,8 +1123,10 @@ function GodNightPanel({ room, godAction, loading }) {
               </div>
             )}
 
-            {/* ① 首夜：所有角色都要輸入玩家號碼 */}
-            {isFirstNight && (
+            {/* ① 首夜：輸入角色玩家號碼
+                例外：機械狼「確認模仿身分」步驟（isMimicReveal）不需輸入；
+                獵人「確認開槍狀態」步驟（identifyPlayers:false 且無 act）不需重複輸入 */}
+            {isFirstNight && !act?.isMimicReveal && !(currentStep.roleId==="hunter" && !act && !currentStep.identifyPlayers) && (
               <div style={{ marginBottom:14, padding:"8px 10px",
                 borderRadius:"var(--border-radius-md)", background:"rgba(0,0,0,0.05)" }}>
                 <div style={{ fontSize:12, fontWeight:500, color:clr.text, marginBottom:6 }}>
@@ -1083,30 +1134,47 @@ function GodNightPanel({ room, godAction, loading }) {
                 </div>
                 {isWolfCamp ? (
                   <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                    {hasWolf2 && (
+                    {/* 機械狼步驟：只顯示機械狼號碼輸入，不顯示狼王/小狼 */}
+                    {currentStep.roleId==="mechawolf" ? (
                       <div>
                         <div style={{ fontSize:12, color:clr.text2, marginBottom:4 }}>
-                          👑 狼王（限選 1 人）
-                          {wolf2Sel.length>1 && <span style={{ color:clr.danger, marginLeft:6 }}>⚠ 只能選 1 人</span>}
+                          🤖 機械狼（限選 1 人，不與小狼見面）
                         </div>
                         <NightPickBtn
-                          stateKey="id_wolf2" multi={true}
-                          label="" opts={aliveNums.filter(n=>!wolfSel.includes(n))}
+                          stateKey="id_mechawolf" multi={false}
+                          label="" opts={aliveNums}
                           na={na} setNightActions={setNightActions}
                         />
                       </div>
+                    ) : (
+                      /* 狼人步驟：顯示狼王 + 小狼，不顯示機械狼 */
+                      <>
+                        {hasWolf2 && (
+                          <div>
+                            <div style={{ fontSize:12, color:clr.text2, marginBottom:4 }}>
+                              👑 狼王（限選 1 人）
+                              {wolf2Sel.length>1 && <span style={{ color:clr.danger, marginLeft:6 }}>⚠ 只能選 1 人</span>}
+                            </div>
+                            <NightPickBtn
+                              stateKey="id_wolf2" multi={true}
+                              label="" opts={aliveNums.filter(n=>!wolfSel.includes(n))}
+                              na={na} setNightActions={setNightActions}
+                            />
+                          </div>
+                        )}
+                        <div>
+                          <div style={{ fontSize:12, color:clr.text2, marginBottom:4 }}>
+                            🐺 狼人（限選 {wolfCount} 人）
+                            {wolfSel.length>wolfCount && <span style={{ color:clr.danger, marginLeft:6 }}>⚠ 最多 {wolfCount} 人</span>}
+                          </div>
+                          <NightPickBtn
+                            stateKey="id_wolf" multi={true}
+                            label="" opts={aliveNums.filter(n=>!wolf2Sel.includes(n))}
+                            na={na} setNightActions={setNightActions}
+                          />
+                        </div>
+                      </>
                     )}
-                    <div>
-                      <div style={{ fontSize:12, color:clr.text2, marginBottom:4 }}>
-                        🐺 狼人（限選 {wolfCount} 人）
-                        {wolfSel.length>wolfCount && <span style={{ color:clr.danger, marginLeft:6 }}>⚠ 最多 {wolfCount} 人</span>}
-                      </div>
-                      <NightPickBtn
-                        stateKey="id_wolf" multi={true}
-                        label="" opts={aliveNums.filter(n=>!wolf2Sel.includes(n))}
-                        na={na} setNightActions={setNightActions}
-                      />
-                    </div>
                   </div>
                 ) : (
                   <NightPickBtn
@@ -1282,8 +1350,119 @@ function GodNightPanel({ room, godAction, loading }) {
                   </div>
                 )}
 
+                {/* 通靈師：選目標，顯示具體身分（考慮機械狼模仿） */}
+                {act.isSpiritist && (
+                  <div>
+                    <NightPickBtn stateKey="spiritCheck" multi={false} label="請選擇查驗目標" opts={aliveNums} na={na} setNightActions={setNightActions} />
+                    {na.spiritCheck?.[0] && (() => {
+                      const target = na.spiritCheck[0];
+                      const mechaNum = roleOwners("mechawolf")[0];
+                      // If target is mechawolf, show mimicked role instead
+                      const isMecha = mechaNum && target === mechaNum;
+                      const mimicTarget = night.mimic?.[0] || na.mimic?.[0];
+                      const mimicRoleId = mimicTarget ? room.roles?.[`p${mimicTarget}`] : null;
+                      const roleId = isMecha
+                        ? (mimicRoleId || "mechawolf")
+                        : room.roles?.[`p${target}`];
+                      const role = ROLE_MAP[roleId];
+                      const rc2  = ROLE_COLORS[roleId];
+                      return (
+                        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:"var(--border-radius-md)",
+                          background:rc2?.bg||clr.bg2, border:`0.5px solid ${rc2?.text||clr.border}` }}>
+                          <div style={{ fontSize:13, fontWeight:500, color:rc2?.text||clr.text }}>
+                            👁 查驗 {target} 號：{role?.emoji} {role?.label || "（身分未知）"}
+                            {isMecha && mimicRoleId && <span style={{ fontSize:11, color:clr.text3 }}> （機械狼模仿）</span>}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* 機械狼：首夜選模仿對象 */}
+                {act.isMimic && (
+                  <div>
+                    <NightPickBtn stateKey="mimic" multi={false} label="請選擇模仿對象（可任選存活玩家）" opts={aliveNums} na={na} setNightActions={setNightActions} />
+                    {na.mimic?.[0] && (() => {
+                      const mimicTarget = na.mimic[0];
+                      const roleId = room.roles?.[`p${mimicTarget}`];
+                      const role   = ROLE_MAP[roleId];
+                      return (
+                        <div style={{ marginTop:8, fontSize:13, color:clr.info }}>
+                          🤖 模仿 {mimicTarget} 號 → {role?.emoji} {role?.label || "（身分未知）"}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* 機械狼：確認模仿到的身分（記錄用） */}
+                {act.isMimicReveal && (() => {
+                  const mimicTarget = night.mimic?.[0] || na.mimic?.[0];
+                  const roleId = mimicTarget ? room.roles?.[`p${mimicTarget}`] : null;
+                  const role   = ROLE_MAP[roleId];
+                  return (
+                    <div style={{ padding:"8px 10px", borderRadius:"var(--border-radius-md)", background:clr.bg2 }}>
+                      <div style={{ fontSize:13, fontWeight:500, color:clr.text }}>
+                        🤖 機械狼模仿身分確認
+                      </div>
+                      {mimicTarget ? (
+                        <div style={{ fontSize:13, color:clr.info, marginTop:4 }}>
+                          模仿 {mimicTarget} 號 → {role?.emoji} {role?.label || "身分未知"}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize:12, color:clr.text3, marginTop:4 }}>尚未選擇模仿對象</div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* 機械狼：第二夜起行動選擇 */}
+                {act.isMechaAction && (() => {
+                  const MECHA_ACTIONS = [
+                    { key:"skill",   label:"🎭 施放技能（模仿到的身分技能）" },
+                    { key:"knife",   label:"🔪 帶刀待機（狼人全滅後獲得擊殺）" },
+                    { key:"skip",    label:"跳過（不行動）" },
+                  ];
+                  const mechaChoice = na.mechaAction;
+                  return (
+                    <div>
+                      <NightChoiceBtn choices={MECHA_ACTIONS} stateKey="mechaAction" na={na} setNightActions={setNightActions} />
+                      {mechaChoice==="skill" && (() => {
+                        const mimicTarget = night.mimic?.[0];
+                        const roleId = mimicTarget ? room.roles?.[`p${mimicTarget}`] : null;
+                        const role   = ROLE_MAP[roleId];
+                        return (
+                          <div style={{ marginTop:8, fontSize:13, color:clr.info }}>
+                            施放 {role?.emoji} {role?.label || "？"} 技能
+                            {roleId==="witch" && (
+                              <div style={{ marginTop:6 }}>
+                                <NightChoiceBtn choices={WITCH_SKILLS.filter(s=>wolfKill||s.key!=="save")} stateKey="mechaWitchChoice" na={na} setNightActions={setNightActions} />
+                                {na.mechaWitchChoice==="save" && wolfKill && (
+                                  <div style={{ fontSize:12, color:clr.success, marginTop:4 }}>💊 自動救回 {wolfKill} 號</div>
+                                )}
+                                {na.mechaWitchChoice==="poison" && (
+                                  <NightPickBtn stateKey="mechaWitchTarget" multi={false} label="選擇毒殺目標" opts={aliveNums} na={na} setNightActions={setNightActions} />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      {mechaChoice==="knife" && (
+                        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:"var(--border-radius-md)", background:clr.warnBg }}>
+                          <div style={{ fontSize:12, color:clr.warn }}>
+                            🔪 帶刀狀態：若狼人陣營（不含機械狼）全數出局，機械狼將在下一狼人階段獲得擊殺技能
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* 一般目標 */}
-                {!act.isWitch && !act.isSwap && !act.isGrant && !act.isGuard && (
+                {!act.isWitch && !act.isSwap && !act.isGrant && !act.isGuard &&
+                 !act.isSpiritist && !act.isMimic && !act.isMimicReveal && !act.isMechaAction && (
                   <div>
                     <NightPickBtn stateKey={act.key} multi={act.multi||false} label={act.label} opts={aliveNums} na={na} setNightActions={setNightActions} />
 
@@ -1340,41 +1519,56 @@ function GodNightPanel({ room, godAction, loading }) {
               </div>
             )}
 
-            {/* 無行動（獵人等），首夜仍顯示號碼輸入完即可 */}
-            {!act && !isFirstNight && (() => {
+            {/* 無行動（獵人等） */}
+            {!act && (() => {
               if (currentStep.roleId !== "hunter") {
+                // 首夜非獵人無行動角色：僅提示閉眼（號碼輸入已在①完成）
+                if (isFirstNight) return null;
                 return <div style={{ fontSize:12, color:clr.text3, fontStyle:"italic" }}>此角色夜晚無行動，請閉眼</div>;
               }
-              // 獵人：判斷是否能開槍
-              // 獵人被女巫毒藥命中（考慮魔術師 swap）→ 不能開槍
+              // 獵人第一步「確認身分」（identifyPlayers:true）：只輸入號碼，不顯示開槍狀態
+              if (currentStep.identifyPlayers) {
+                return <div style={{ fontSize:12, color:clr.text3 }}>身分確認完畢後，請閉眼等待後續通知</div>;
+              }
+              // 獵人確認開槍狀態
               const swap = room.night?.swap?.length===2 ? room.night.swap : null;
-              // 女巫毒藥目標（原始，未 swap）
-              const poisonRaw = room.night?.witchPoison?.[0];
-              // 毒藥實際作用目標（經 swap）
+              const poisonRaw  = room.night?.witchPoison?.[0];
               const poisonReal = swapTarget(poisonRaw, swap);
-              // 獵人號碼
+              // 首夜：優先用已填入的 id_hunter，其次從 room.roles 讀
               const hunterNum = isFirstNight
-                ? (na["id_hunter"]||[])[0]
+                ? ((na["id_hunter"]||[])[0] || roleOwners("hunter")[0])
                 : roleOwners("hunter")[0];
-              // 獵人被毒殺：毒藥實際打到獵人
-              const hunterPoisoned = hunterNum && poisonReal === hunterNum;
+              const hunterPoisoned = hunterNum && poisonReal === Number(hunterNum);
               const canShoot = !hunterPoisoned;
               return (
-                <div style={{ padding:"8px 12px", borderRadius:"var(--border-radius-md)",
-                  background: canShoot ? clr.successBg : clr.dangerBg,
-                  border: `0.5px solid ${canShoot ? clr.success : clr.danger}` }}>
-                  <div style={{ fontSize:13, fontWeight:500,
-                    color: canShoot ? clr.success : clr.danger }}>
-                    🏹 獵人開槍狀態：{canShoot ? "✓ 可以開槍" : "✗ 被毒殺，不能開槍"}
-                  </div>
-                  {hunterPoisoned && (
-                    <div style={{ fontSize:12, color:clr.danger, marginTop:4 }}>
-                      女巫毒藥命中獵人（{hunterNum} 號）{swap && poisonRaw !== poisonReal ? `，經魔術師互換（原目標 ${poisonRaw} 號）` : ""}
+                <div>
+                  {/* 首夜：顯示自動帶入的獵人號碼 */}
+                  {isFirstNight && hunterNum && (
+                    <div style={{ marginBottom:8, fontSize:13, color:rc?.text||clr.warn }}>
+                      🏹 獵人：{hunterNum} 號（已自動帶入）
                     </div>
                   )}
-                  {!hunterNum && (
-                    <div style={{ fontSize:12, color:clr.text3, marginTop:4 }}>（獵人號碼未確認，請於下一夜首先確認）</div>
+                  {isFirstNight && !hunterNum && (
+                    <div style={{ marginBottom:8, fontSize:12, color:clr.danger }}>
+                      ⚠ 獵人號碼未填入，請返回上一步確認
+                    </div>
                   )}
+                  <div style={{ padding:"8px 12px", borderRadius:"var(--border-radius-md)",
+                    background: canShoot ? clr.successBg : clr.dangerBg,
+                    border: `0.5px solid ${canShoot ? clr.success : clr.danger}` }}>
+                    <div style={{ fontSize:13, fontWeight:500,
+                      color: canShoot ? clr.success : clr.danger }}>
+                      🏹 獵人開槍狀態：{canShoot ? "✓ 可以開槍" : "✗ 被毒殺，不能開槍"}
+                    </div>
+                    {hunterPoisoned && (
+                      <div style={{ fontSize:12, color:clr.danger, marginTop:4 }}>
+                        女巫毒藥命中獵人（{hunterNum} 號）{swap && poisonRaw !== poisonReal ? `，經魔術師互換（原目標 ${poisonRaw} 號）` : ""}
+                      </div>
+                    )}
+                    {!hunterNum && !isFirstNight && (
+                      <div style={{ fontSize:12, color:clr.text3, marginTop:4 }}>（獵人號碼未確認）</div>
+                    )}
+                  </div>
                 </div>
               );
             })()}
@@ -1573,14 +1767,14 @@ export default function App() {
         }
 
         case "tallyVotes": {
-          const votes=r.campaign.votes;
-          const finals=r.campaign.pkRound?r.campaign.pkCandidates:r.campaign.finalCandidates;
+          const votes=r.campaign.votes||{};
+          const finals=(r.campaign.pkRound?r.campaign.pkCandidates:r.campaign.finalCandidates)||[];
           const tally={}; finals.forEach(n=>tally[n]=0); tally[0]=0;
           Object.entries(votes||{}).forEach(([voter,target]) => {
             const w=Number(voter)===r.sheriff?1.5:1;
             if (tally[target]!==undefined) tally[target]+=w; else tally[target]=w;
           });
-          const maxV=Math.max(...finals.map(n=>tally[n]||0));
+          const maxV=finals.length?Math.max(...finals.map(n=>tally[n]||0)):0;
           const winners=finals.filter(n=>(tally[n]||0)===maxV);
           const lbl=r.campaign.pkRound?"警長競選 PK":"警長競選";
           if (winners.length===1) {
@@ -1611,7 +1805,7 @@ export default function App() {
 
         case "startPK": {
           r.campaign.votes={}; r.campaign.votesPublished=false;
-          r.log.push(`PK 開始：${r.campaign.pkCandidates.join("、")} 號`);
+          r.log.push(`PK 開始：${(r.campaign.pkCandidates||[]).join("、")} 號`);
           break;
         }
 
@@ -1646,8 +1840,9 @@ export default function App() {
           // Handle wolf identity split
           if (d._wolfIdentify) {
             const wi = d._wolfIdentify;
-            wi.wolf2.forEach(n => { r.roles[`p${n}`]="wolf2"; });
-            wi.wolf.forEach(n  => { r.roles[`p${n}`]="wolf";  });
+            wi.wolf2.forEach(n    => { r.roles[`p${n}`]="wolf2";    });
+            wi.wolf.forEach(n     => { r.roles[`p${n}`]="wolf";     });
+            (wi.mechawolf||[]).forEach(n=>{ r.roles[`p${n}`]="mechawolf"; });
             const cleaned = { ...d };
             delete cleaned._wolfIdentify;
             Object.entries(cleaned).forEach(([k,v]) => r.night[k]=v);
@@ -2052,7 +2247,7 @@ export default function App() {
       {phase==="campaign" && (
         <div style={card}>
           <div style={{ fontSize:14, fontWeight:500, color:clr.text, marginBottom:8 }}>警長競選·發言環節</div>
-          <div style={{ fontSize:13, color:clr.text2 }}>競選玩家：{campaign.candidates.join("、")} 號</div>
+          <div style={{ fontSize:13, color:clr.text2 }}>競選玩家：{(campaign.candidates||[]).join("、")} 號</div>
           <div style={{ marginTop:6, fontSize:13, color:clr.info }}>首發：{campaign.currentSpeaker} 號，方向：{campaign.speakerDir}</div>
           <div style={{ marginTop:8, fontSize:12, color:clr.text3 }}>等待上帝宣布最終競選名單...</div>
         </div>
@@ -2511,10 +2706,10 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
             <div style={card}>
               <div style={{ fontSize:14, fontWeight:500, color:clr.text, marginBottom:8 }}>警長投票進行中</div>
               <div style={{ fontSize:13, color:clr.text2, marginBottom:12 }}>
-                競選玩家：{campaign.finalCandidates.join("、")} 號
+                競選玩家：{(campaign.finalCandidates||[]).join("、")} 號
                 <span style={{ marginLeft:8, color:clr.danger, fontSize:12 }}>（警上玩家不可投票）</span>
               </div>
-              <GodVoteMatrix votes={campaign.votes} candidates={campaign.finalCandidates} />
+              <GodVoteMatrix votes={campaign.votes} candidates={campaign.finalCandidates||[]} />
               <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:12 }}>
                 <button disabled={loading} onClick={()=>godAction("tallyVotes")}
                   style={{ ...btn("success") }}>
@@ -2574,7 +2769,7 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
           {room.phase==="campaignPK" && !campaign.result && !campaign.votesPublished && Object.keys(campaign?.votes||{}).length===0 && (
             <div style={card}>
               <div style={{ fontSize:14, fontWeight:500, color:clr.warn, marginBottom:8 }}>⚡ 首輪平票</div>
-              <div style={{ fontSize:13, color:clr.text2, marginBottom:4 }}>PK 玩家：{campaign.pkCandidates.join("、")} 號</div>
+              <div style={{ fontSize:13, color:clr.text2, marginBottom:4 }}>PK 玩家：{(campaign.pkCandidates||[]).join("、")} 號</div>
               <div style={{ fontSize:12, color:clr.text3, marginBottom:12 }}>PK 輪所有非 PK 玩家皆可投票（包含原警上玩家）</div>
               <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                 <button disabled={loading} onClick={()=>godAction("startPK")} style={{ ...btn("warn") }}>
@@ -2594,10 +2789,10 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
             <div style={card}>
               <div style={{ fontSize:14, fontWeight:500, color:clr.text, marginBottom:8 }}>⚡ PK 投票進行中</div>
               <div style={{ fontSize:13, color:clr.text2, marginBottom:12 }}>
-                PK 玩家：{campaign.pkCandidates.join("、")} 號
+                PK 玩家：{(campaign.pkCandidates||[]).join("、")} 號
                 <span style={{ marginLeft:8, color:clr.danger, fontSize:12 }}>（PK 玩家不可投票）</span>
               </div>
-              <GodVoteMatrix votes={campaign.votes} candidates={campaign.pkCandidates} />
+              <GodVoteMatrix votes={campaign.votes} candidates={campaign.pkCandidates||[]} />
               <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginTop:12 }}>
                 <button disabled={loading} onClick={()=>godAction("tallyVotes")}
                   style={{ ...btn("success") }}>
