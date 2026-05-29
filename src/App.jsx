@@ -1030,10 +1030,26 @@ function GodNightPanel({ room, godAction, loading }) {
         const swap = night.swap?.length===2 ? night.swap : null;
         const sr = night.check?.[0]
           ? getSeerResult(night.check[0], swap, room.roles||{}) : null;
+        // 通靈師查驗結果（顯示具體身分，考慮機械狼模仿）
+        const spiritTarget = night.spiritCheck?.[0];
+        const spiritResult = spiritTarget ? (() => {
+          const mechaNum = Object.entries(room.roles||{}).find(([,v])=>v==="mechawolf")?.[0]?.replace("p","");
+          const isMecha  = mechaNum && Number(spiritTarget)===Number(mechaNum);
+          const mimicTarget = night.mimic?.[0];
+          const mimicRoleId = mimicTarget ? room.roles?.[`p${mimicTarget}`] : null;
+          const roleId = isMecha ? (mimicRoleId||"mechawolf") : room.roles?.[`p${spiritTarget}`];
+          return { roleId, role:ROLE_MAP[roleId], isMecha, mimicRoleId };
+        })() : null;
+        // 獵人開槍狀態
+        const hunterNum = Object.entries(room.roles||{}).find(([,v])=>v==="hunter")?.[0]?.replace("p","");
+        const poisonReal = swapTarget(night.witchPoison?.[0], swap);
+        const hunterPoisoned = hunterNum && poisonReal && Number(poisonReal)===Number(hunterNum);
+        const showHunterStatus = hunterNum != null;
+
         const hasAny = night.kill?.[0] || night.guard?.[0] || night.dream?.[0] ||
           night.witchSave?.[0] || night.witchPoison?.[0] || night.swap?.length===2 ||
-          night.grant?.[0] || night.idol?.[0] || night.check?.[0] ||
-          night.lucky?.[0] || room.lonegirlTransformed;
+          night.grant?.[0] || night.idol?.[0] || night.check?.[0] || night.mimic?.[0] ||
+          night.spiritCheck?.[0] || night.lucky?.[0] || room.lonegirlTransformed || showHunterStatus;
         if (!hasAny) return null;
         return (
           <div style={{ ...card, marginBottom:12, background:clr.bg2, border:`0.5px solid ${clr.border}` }}>
@@ -1047,17 +1063,34 @@ function GodNightPanel({ room, godAction, loading }) {
               {night.idol?.[0] && (
                 <div style={{ color:clr.warn }}>💘 偶像：{night.idol[0]} 號</div>
               )}
+              {night.mimic?.[0] && (() => {
+                const mimicTarget = night.mimic[0];
+                const mimicRoleId = room.roles?.[`p${mimicTarget}`];
+                const mimicRole   = ROLE_MAP[mimicRoleId];
+                const mimicRc     = ROLE_COLORS[mimicRoleId];
+                return (
+                  <div style={{ padding:"3px 8px", borderRadius:"var(--border-radius-md)",
+                    background:clr.dangerBg }}>
+                    <span style={{ fontSize:13, color:clr.danger }}>
+                      🤖 機械狼模仿：{mimicTarget} 號
+                      {mimicRole && <span style={{ marginLeft:6 }}>→ {mimicRole.emoji} {mimicRole.label}</span>}
+                    </span>
+                  </div>
+                );
+              })()}
               {night.grant?.[0] && (
                 <div style={{ color:clr.success }}>🛒 商人授予 {night.grant[0]} 號：{GRANT_SKILLS.find(g=>g.key===night.grantSkill?.[0])?.label||"技能"}</div>
               )}
               {night.dream?.[0] && (
                 <div style={{ color:clr.info }}>🌙 攝夢目標：{night.dream[0]} 號</div>
               )}
+              {night.guard?.[0]!==undefined && (
+                <div style={{ color:clr.success }}>
+                  🛡 守衛守護：{night.guard[0] ? `${swapTarget(night.guard[0], swap)} 號` : "空放"}
+                </div>
+              )}
               {night.kill?.[0] && (
                 <div style={{ color:clr.danger }}>🐺 狼殺目標：{swapTarget(night.kill[0], swap)} 號{swap && swapTarget(night.kill[0],swap)!==night.kill[0]?` （原 ${night.kill[0]} 號，經魔術師互換）`:""}</div>
-              )}
-              {night.guard?.[0] && (
-                <div style={{ color:clr.success }}>🛡 守衛守護：{swapTarget(night.guard[0], swap)} 號</div>
               )}
               {night.witchSave?.[0] && (
                 <div style={{ color:clr.success }}>💊 女巫救人：{swapTarget(night.witchSave[0], swap)} 號</div>
@@ -1068,6 +1101,19 @@ function GodNightPanel({ room, godAction, loading }) {
               {night.lucky?.[0] && (
                 <div style={{ color:clr.success }}>🍀 幸運兒技能目標：{night.lucky[0]} 號</div>
               )}
+              {spiritTarget && spiritResult && (() => {
+                const { role, isMecha, mimicRoleId } = spiritResult;
+                const rc2 = ROLE_COLORS[spiritResult.roleId];
+                return (
+                  <div style={{ padding:"3px 8px", borderRadius:"var(--border-radius-md)",
+                    background:rc2?.bg||clr.bg3, border:`0.5px solid ${rc2?.text||clr.border}` }}>
+                    <span style={{ fontSize:13, color:rc2?.text||clr.text }}>
+                      👁 通靈師查驗 {spiritTarget} 號：{role?.emoji} {role?.label||"（身分未知）"}
+                      {isMecha && mimicRoleId && <span style={{ fontSize:11, color:clr.text3 }}> （機械狼模仿）</span>}
+                    </span>
+                  </div>
+                );
+              })()}
               {night.check?.[0] && sr && (
                 <div style={{ padding:"3px 8px", borderRadius:"var(--border-radius-md)",
                   background: sr.isWolf?clr.dangerBg:clr.successBg,
@@ -1075,6 +1121,14 @@ function GodNightPanel({ room, godAction, loading }) {
                   🔮 預言家查驗 {sr.checkTarget} 號
                   {sr.swapped && <span style={{ fontSize:11 }}> → 實際看 {sr.realTarget} 號</span>}
                   ：{sr.isWolf ? "⚠ 狼人陣營" : "✓ 好人陣營"}
+                </div>
+              )}
+              {showHunterStatus && (
+                <div style={{ padding:"3px 8px", borderRadius:"var(--border-radius-md)",
+                  background:hunterPoisoned?clr.dangerBg:clr.successBg }}>
+                  <span style={{ fontSize:13, color:hunterPoisoned?clr.danger:clr.success }}>
+                    🏹 獵人 {hunterNum} 號：{hunterPoisoned?"✗ 被毒殺，不能開槍":"✓ 可以開槍"}
+                  </span>
                 </div>
               )}
               {room.lonegirlTransformed && room.lonegirlNewRole && (
