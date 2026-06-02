@@ -253,7 +253,12 @@ function computeNightDeaths(night, lastDreamTarget) {
 
   // 所有技能目標先經過魔術師互換轉換
   const wolfTarget   = swapTarget(night.kill?.[0],         swap);
-  const guardTarget  = swapTarget(night.guard?.[0],        swap);
+  // 機械狼守護（模仿守衛時）與守衛守護合併：只要任一保護即可
+  const mechaGuardRaw = night.mechaGuard?.[0];
+  const guardRaw      = night.guard?.[0] || null;
+  // 機械狼模仿狼人時的第二刀
+  const mechaKillRaw  = night.mechaKill?.[0];
+  const guardTarget   = swapTarget(guardRaw, swap) || swapTarget(mechaGuardRaw, swap);
   const dreamTarget  = swapTarget(night.dream?.[0],        swap);
   const witchSave    = swapTarget(night.witchSave?.[0],    swap);
   const witchPoison  = swapTarget(night.witchPoison?.[0],  swap);
@@ -298,6 +303,12 @@ function computeNightDeaths(night, lastDreamTarget) {
     const singleWitch = witchSave === wolfTarget  && guardTarget !== wolfTarget;
     const saved = singleGuard || singleWitch;
     if (!saved) killed.push({ num: wolfTarget, reason: "狼人擊殺" });
+  }
+
+  // ── 機械狼模仿狼人時的額外擊殺（不受守衛/女巫保護影響，但受攝夢保護） ──
+  const mechaKill = swapTarget(mechaKillRaw, swap);
+  if (mechaKill && mechaKill !== dreamTarget) {
+    killed.push({ num: mechaKill, reason: "機械狼擊殺" });
   }
 
   // ── 女巫毒殺（非攝夢目標、非攝夢人，攝夢人單獨處理過了） ──
@@ -806,6 +817,29 @@ function NightHistory({ nightHistory, roles }) {
                       </div>
                     );
                   })()}
+                  {entry.mechaGuard && (
+                    <div style={{ color:clr.success }}>🤖🛡 機械狼守護：{entry.mechaGuard} 號</div>
+                  )}
+                  {entry.mechaKill && (
+                    <div style={{ color:clr.danger }}>🤖🔪 機械狼擊殺：{entry.mechaKill} 號</div>
+                  )}
+                  {entry.mechaSpiritCheck && (() => {
+                    const t      = entry.mechaSpiritCheck;
+                    const mechaNum = Object.entries(entry.roles||{}).find(([,v])=>v==="mechawolf")?.[0]?.replace("p","");
+                    const isMecha  = mechaNum && Number(t)===Number(mechaNum);
+                    const mimicT   = entry.mimic;
+                    const mimicRId = mimicT ? entry.roles?.[`p${mimicT}`] : null;
+                    const roleId   = isMecha ? (mimicRId||"mechawolf") : entry.roles?.[`p${t}`];
+                    const role2    = ROLE_MAP[roleId];
+                    const rc2      = ROLE_COLORS[roleId];
+                    return (
+                      <div style={{ padding:"2px 8px", borderRadius:"var(--border-radius-md)",
+                        background:rc2?.bg||clr.bg3, color:rc2?.text||clr.text }}>
+                        🤖👁 機械狼查驗 {t} 號：{role2?.emoji} {role2?.label||"（身分未知）"}
+                        {isMecha && mimicRId && <span style={{ fontSize:11, opacity:0.7 }}> （機械狼模仿）</span>}
+                      </div>
+                    );
+                  })()}
                   {entry.grant && (
                     <div>🛒 商人授予 {entry.grant} 號：{GRANT_SKILLS.find(g=>g.key===entry.grantSkill)?.label||"技能"}</div>
                   )}
@@ -970,8 +1004,20 @@ function GodNightPanel({ room, godAction, loading }) {
       // Confirmation step only
     } else if (act?.isMechaAction) {
       stepData.mechaAction = na.mechaAction ? [na.mechaAction] : [];
-      if (na.mechaAction==="skill" && na.mechaWitchChoice==="save")   stepData.witchSave   = wolfKill ? [wolfKill] : [];
-      if (na.mechaAction==="skill" && na.mechaWitchChoice==="poison") stepData.witchPoison = na.mechaWitchTarget||[];
+      if (na.mechaAction==="skill") {
+        const mimicTarget  = room.night?.mimic?.[0];
+        const mimicRoleId  = mimicTarget ? room.roles?.[`p${mimicTarget}`] : null;
+        if (mimicRoleId==="witch") {
+          if (na.mechaWitchChoice==="save")   stepData.witchSave   = wolfKill ? [wolfKill] : [];
+          if (na.mechaWitchChoice==="poison") stepData.witchPoison = na.mechaWitchTarget||[];
+        } else if (mimicRoleId==="guard") {
+          stepData.mechaGuard = na.mechaGuard||[];
+        } else if (mimicRoleId==="spiritist") {
+          stepData.mechaSpiritCheck = na.mechaSpiritCheck||[];
+        } else if (mimicRoleId==="wolf" || mimicRoleId==="wolf2") {
+          stepData.mechaKill = na.mechaKill||[];
+        }
+      }
     } else if (act) {
       stepData[act.key] = na[act.key]||[];
     }
@@ -1502,41 +1548,119 @@ function GodNightPanel({ room, godAction, loading }) {
 
                 {/* 機械狼：第二夜起行動選擇 */}
                 {act.isMechaAction && (() => {
+                  const mimicTarget  = room.night?.mimic?.[0];
+                  const mimicRoleId  = mimicTarget ? room.roles?.[`p${mimicTarget}`] : null;
+                  const mimicRole    = ROLE_MAP[mimicRoleId];
+
+                  // Check if all wolves (excl. mechawolf) are dead → knife becomes kill
+                  const wolfsDead = Array.from({length:12},(_,i)=>i+1).every(n=>{
+                    const rid = room.roles?.[`p${n}`];
+                    if (rid!=="wolf" && rid!=="wolf2") return true;
+                    return Object.values(room.players||{}).find(p=>p.num===n)?.dead;
+                  });
+
+                  const hasSkill = mimicRoleId && ["witch","guard","spiritist","wolf","wolf2"].includes(mimicRoleId);
+                  const isKnifeActive = wolfsDead;
+
                   const MECHA_ACTIONS = [
-                    { key:"skill",   label:"🎭 施放技能（模仿到的身分技能）" },
-                    { key:"knife",   label:"🔪 帶刀待機（狼人全滅後獲得擊殺）" },
-                    { key:"skip",    label:"跳過（不行動）" },
+                    ...(hasSkill ? [{ key:"skill", label:`🎭 施放技能（${mimicRole?.emoji||""} ${mimicRole?.label||"？"}）` }] : []),
+                    { key:"knife", label: isKnifeActive ? "🔪 帶刀（已激活！可選擇擊殺目標）" : "🔪 帶刀待機（狼人全滅後激活擊殺）" },
+                    { key:"skip",  label:"跳過（不行動）" },
                   ];
+
                   const mechaChoice = na.mechaAction;
+                  // Hunter gun status
+                  const hunterNum2 = roleOwners("hunter")[0];
+                  const poisonRealH = swapTarget(night.witchPoison?.[0], room.night?.swap?.length===2?room.night.swap:null);
+                  const mechaHunterKilled = mimicRoleId==="hunter" &&
+                    hunterNum2 && poisonRealH && Number(poisonRealH)===Number(hunterNum2);
+
                   return (
                     <div>
+                      {/* 獵人：先顯示開槍狀態 */}
+                      {mimicRoleId==="hunter" && (
+                        <div style={{ marginBottom:10, padding:"6px 10px", borderRadius:"var(--border-radius-md)",
+                          background:mechaHunterKilled?clr.dangerBg:clr.successBg }}>
+                          <span style={{ fontSize:13, fontWeight:500, color:mechaHunterKilled?clr.danger:clr.success }}>
+                            🏹 機械狼（模仿獵人）開槍狀態：{mechaHunterKilled?"✗ 被毒殺，不能開槍":"✓ 可以開槍"}
+                          </span>
+                        </div>
+                      )}
+
                       <NightChoiceBtn choices={MECHA_ACTIONS} stateKey="mechaAction" na={na} setNightActions={setNightActions} />
+
+                      {/* 施放技能：依模仿角色顯示不同 UI */}
                       {mechaChoice==="skill" && (() => {
-                        const mimicTarget = night.mimic?.[0];
-                        const roleId = mimicTarget ? room.roles?.[`p${mimicTarget}`] : null;
-                        const role   = ROLE_MAP[roleId];
-                        return (
-                          <div style={{ marginTop:8, fontSize:13, color:clr.info }}>
-                            施放 {role?.emoji} {role?.label || "？"} 技能
-                            {roleId==="witch" && (
-                              <div style={{ marginTop:6 }}>
-                                <NightChoiceBtn choices={WITCH_SKILLS.filter(s=>wolfKill||s.key!=="save")} stateKey="mechaWitchChoice" na={na} setNightActions={setNightActions} />
-                                {na.mechaWitchChoice==="save" && wolfKill && (
-                                  <div style={{ fontSize:12, color:clr.success, marginTop:4 }}>💊 自動救回 {wolfKill} 號</div>
-                                )}
-                                {na.mechaWitchChoice==="poison" && (
-                                  <NightPickBtn stateKey="mechaWitchTarget" multi={false} label="選擇毒殺目標" opts={aliveNums} na={na} setNightActions={setNightActions} />
-                                )}
+                        if (mimicRoleId==="witch") {
+                          const witchNum2 = isFirstNight?(na["id_witch"]||[])[0]:roleOwners("witch")[0];
+                          const mechaSelf = roleOwners("mechawolf")[0];
+                          const mechaPoisoned = wolfKill && mechaSelf && Number(wolfKill)===Number(mechaSelf);
+                          const canMechaSave = wolfKill && !mechaPoisoned && !room.witchSaveUsed;
+                          const availSkills = WITCH_SKILLS.filter(s=>{
+                            if(s.key==="save") return canMechaSave;
+                            if(s.key==="poison") return !room.witchPoisonUsed;
+                            return true;
+                          });
+                          return (
+                            <div style={{ marginTop:8 }}>
+                              <div style={{ fontSize:12, color:clr.text2, marginBottom:4 }}>
+                                今晚被殺：<strong>{wolfKill?`${wolfKill} 號`:"無（平安夜）"}</strong>
                               </div>
-                            )}
+                              <NightChoiceBtn choices={availSkills} stateKey="mechaWitchChoice" na={na} setNightActions={setNightActions} />
+                              {na.mechaWitchChoice==="save" && wolfKill && (
+                                <div style={{ fontSize:12, color:clr.success, marginTop:4 }}>💊 自動救回 {wolfKill} 號</div>
+                              )}
+                              {na.mechaWitchChoice==="poison" && (
+                                <NightPickBtn stateKey="mechaWitchTarget" multi={false} label="選擇毒殺目標" opts={aliveNums} na={na} setNightActions={setNightActions} />
+                              )}
+                            </div>
+                          );
+                        }
+                        if (mimicRoleId==="guard") return (
+                          <div style={{ marginTop:8 }}>
+                            <NightPickBtn stateKey="mechaGuard" multi={false} label="🛡 選擇守護目標（免疫狼刀與毒藥）" opts={aliveNums} na={na} setNightActions={setNightActions} />
+                            <button onClick={()=>setNightActions(p=>({...p,mechaGuard:[]}))}
+                              style={{ marginTop:6, ...btn((!na.mechaGuard||na.mechaGuard.length===0)?"warn":"default"), fontSize:12, padding:"4px 10px" }}>
+                              空放
+                            </button>
                           </div>
                         );
-                      })()}
-                      {mechaChoice==="knife" && (
-                        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:"var(--border-radius-md)", background:clr.warnBg }}>
-                          <div style={{ fontSize:12, color:clr.warn }}>
-                            🔪 帶刀狀態：若狼人陣營（不含機械狼）全數出局，機械狼將在下一狼人階段獲得擊殺技能
+                        if (mimicRoleId==="spiritist") return (
+                          <div style={{ marginTop:8 }}>
+                            <NightPickBtn stateKey="mechaSpiritCheck" multi={false} label="👁 選擇查驗目標（顯示真實身分）" opts={aliveNums} na={na} setNightActions={setNightActions} />
+                            {na.mechaSpiritCheck?.[0] && (() => {
+                              const t = na.mechaSpiritCheck[0];
+                              const rId = room.roles?.[`p${t}`];
+                              const r2  = ROLE_MAP[rId];
+                              const rc2 = ROLE_COLORS[rId];
+                              return (
+                                <div style={{ marginTop:8, padding:"6px 10px", borderRadius:"var(--border-radius-md)",
+                                  background:rc2?.bg||clr.bg2, color:rc2?.text||clr.text }}>
+                                  查驗 {t} 號：{r2?.emoji} {r2?.label||"（身分未知）"}
+                                </div>
+                              );
+                            })()}
                           </div>
+                        );
+                        if (mimicRoleId==="wolf"||mimicRoleId==="wolf2") return (
+                          <div style={{ marginTop:8 }}>
+                            {wolfsDead
+                              ? <NightPickBtn stateKey="mechaKill" multi={false} label="🐺 機械狼擊殺目標（帶刀激活）" opts={aliveNums} na={na} setNightActions={setNightActions} />
+                              : <div style={{ fontSize:12, color:clr.text3 }}>小狼仍存活，帶刀尚未激活</div>}
+                          </div>
+                        );
+                        return null;
+                      })()}
+
+                      {/* 帶刀激活：選擊殺目標 */}
+                      {mechaChoice==="knife" && isKnifeActive && (
+                        <div style={{ marginTop:8 }}>
+                          <NightPickBtn stateKey="mechaKill" multi={false} label="🔪 選擇擊殺目標（帶刀激活）" opts={aliveNums} na={na} setNightActions={setNightActions} />
+                        </div>
+                      )}
+                      {mechaChoice==="knife" && !isKnifeActive && (
+                        <div style={{ marginTop:8, padding:"6px 10px", borderRadius:"var(--border-radius-md)", background:clr.warnBg }}>
+                          <div style={{ fontSize:12, color:clr.warn }}>🔪 帶刀待機：小狼全滅後激活擊殺能力</div>
                         </div>
                       )}
                     </div>
@@ -1985,6 +2109,9 @@ export default function App() {
             check:        r.night.check?.[0]        || null,
             mimic:        r.night.mimic?.[0]        || null,
             spiritCheck:  r.night.spiritCheck?.[0]  || null,
+            mechaGuard:   r.night.mechaGuard?.[0]   || null,
+            mechaSpiritCheck: r.night.mechaSpiritCheck?.[0] || null,
+            mechaKill:    r.night.mechaKill?.[0]    || null,
             lonegirlTransformed: r.lonegirlTransformed || false,
             lonegirlNewRole:     r.lonegirlNewRole     || null,
             roles: { ...r.roles },
