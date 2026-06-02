@@ -796,20 +796,32 @@ function NightHistory({ nightHistory, roles }) {
                   {entry.idol && (
                     <div>💘 偶像：{entry.idol} 號</div>
                   )}
+                  {entry.mimic && (() => {
+                    const mimicRoleId = entry.roles?.[`p${entry.mimic}`];
+                    const mimicRole   = ROLE_MAP[mimicRoleId];
+                    return (
+                      <div style={{ color:clr.danger }}>
+                        🤖 機械狼模仿：{entry.mimic} 號
+                        {mimicRole && ` → ${mimicRole.emoji} ${mimicRole.label}`}
+                      </div>
+                    );
+                  })()}
                   {entry.grant && (
                     <div>🛒 商人授予 {entry.grant} 號：{GRANT_SKILLS.find(g=>g.key===entry.grantSkill)?.label||"技能"}</div>
                   )}
                   {entry.dream && (
                     <div>🌙 攝夢目標：{entry.dream} 號</div>
                   )}
+                  {entry.guard!=null && (
+                    <div style={{ color:entry.guard==="空放"?clr.text3:clr.success }}>
+                      🛡 守衛守護：{entry.guard==="空放" ? "空放" : `${swapTarget(entry.guard, swap)} 號`}
+                    </div>
+                  )}
                   {entry.kill && (
                     <div style={{ color:clr.danger }}>
                       🐺 狼殺目標：{swapTarget(entry.kill, swap)} 號
                       {swap && swapTarget(entry.kill,swap)!==entry.kill ? ` （原 ${entry.kill} 號，經互換）` : ""}
                     </div>
-                  )}
-                  {entry.guard && (
-                    <div style={{ color:clr.success }}>🛡 守衛守護：{swapTarget(entry.guard, swap)} 號</div>
                   )}
                   {entry.witchSave && (
                     <div style={{ color:clr.success }}>💊 女巫救人：{swapTarget(entry.witchSave, swap)} 號</div>
@@ -820,6 +832,23 @@ function NightHistory({ nightHistory, roles }) {
                   {entry.lucky && (
                     <div>🍀 幸運兒技能目標：{entry.lucky} 號</div>
                   )}
+                  {entry.spiritCheck && (() => {
+                    const target = entry.spiritCheck;
+                    const mechaNum = Object.entries(entry.roles||{}).find(([,v])=>v==="mechawolf")?.[0]?.replace("p","");
+                    const isMecha  = mechaNum && Number(target)===Number(mechaNum);
+                    const mimicTarget = entry.mimic;
+                    const mimicRoleId = mimicTarget ? entry.roles?.[`p${mimicTarget}`] : null;
+                    const roleId = isMecha ? (mimicRoleId||"mechawolf") : entry.roles?.[`p${target}`];
+                    const role   = ROLE_MAP[roleId];
+                    const rc2    = ROLE_COLORS[roleId];
+                    return (
+                      <div style={{ padding:"2px 8px", borderRadius:"var(--border-radius-md)",
+                        background:rc2?.bg||clr.bg3, color:rc2?.text||clr.text }}>
+                        👁 通靈師查驗 {target} 號：{role?.emoji} {role?.label||"（身分未知）"}
+                        {isMecha && mimicRoleId && <span style={{ fontSize:11, opacity:0.7 }}> （機械狼模仿）</span>}
+                      </div>
+                    );
+                  })()}
                   {sr && (
                     <div style={{ padding:"3px 8px", borderRadius:"var(--border-radius-md)",
                       background:sr.isWolf?clr.dangerBg:clr.successBg,
@@ -1944,7 +1973,7 @@ export default function App() {
             label: `第 ${r.dayCount} 夜`,
             deaths,
             kill:         r.night.kill?.[0]        || null,
-            guard:        r.night.guard?.[0]        || null,
+            guard:        r.night.guard?.length>0 ? r.night.guard[0] : (r.night.guard ? "空放" : null),
             dream:        r.night.dream?.[0]        || null,
             witchSave:    r.night.witchSave?.[0]    || null,
             witchPoison:  r.night.witchPoison?.[0]  || null,
@@ -1954,9 +1983,11 @@ export default function App() {
             lucky:        r.night.lucky?.[0]        || null,
             idol:         r.night.idol?.[0]         || null,
             check:        r.night.check?.[0]        || null,
+            mimic:        r.night.mimic?.[0]        || null,
+            spiritCheck:  r.night.spiritCheck?.[0]  || null,
             lonegirlTransformed: r.lonegirlTransformed || false,
             lonegirlNewRole:     r.lonegirlNewRole     || null,
-            roles: { ...r.roles },  // snapshot of roles at time of resolution
+            roles: { ...r.roles },
           });
 
           // 覺醒孤獨少女：偶像夜晚死亡 → 繼承偶像角色（下一夜生效）
