@@ -2017,7 +2017,7 @@ export default function App() {
         }
 
         case "tallyExile": {
-          const votes=r.exile.votes, targets=r.exile.targetOptions;
+          const votes=r.exile.votes||{}, targets=r.exile.targetOptions||[];
           const tally={}; targets.forEach(n=>tally[n]=0); tally[0]=0;
           Object.entries(votes||{}).forEach(([voter,target]) => {
             const w=Number(voter)===r.sheriff?1.5:1;
@@ -2331,7 +2331,7 @@ export default function App() {
             {announcing ? (
               <div style={{ fontSize:13, color:clr.warn }}>等待上帝宣布 PK 開始...</div>
             ) : canVote && !voted ? (
-              <VoteButtons options={[...actCands,0]} onVote={castVote} label="選擇你支持的玩家" />
+              <VoteButtons options={[...(actCands||[]),0]} onVote={castVote} label="選擇你支持的玩家" />
             ) : canVote && voted ? (
               <div style={{ fontSize:13, color:clr.success }}>✓ 已投票 → {myVote===0?"棄票":myVote+" 號"}</div>
             ) : !isAlive ? (
@@ -2367,7 +2367,7 @@ export default function App() {
               <div style={{ fontSize:13, color:clr.warn }}>🃏 白癡身份已揭露，你已失去投票權</div>
             );
             return isAlive && !voted ? (
-              <VoteButtons options={[...exile.targetOptions,0]} onVote={castVote} label="選擇放逐的玩家" isDanger />
+              <VoteButtons options={[...(exile.targetOptions||[]),0]} onVote={castVote} label="選擇放逐的玩家" isDanger />
             ) : (
               <div style={{ fontSize:13, color:clr.success }}>
                 {voted?`已投票 → ${myVote===0?"棄票":myVote+" 號"}`:"你已出局，無法投票"}
