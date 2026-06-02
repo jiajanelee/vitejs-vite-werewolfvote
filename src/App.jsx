@@ -462,7 +462,7 @@ function NightChoiceBtn({ stateKey, choices, na, setNightActions }) {
   const sel = na[stateKey];
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:6, marginTop:6 }}>
-      {choices.map(c=>(
+      {(choices||[]).map(c=>(
         <button key={c.key}
           onClick={()=>setNightActions(prev=>({...prev,[stateKey]:c.key}))}
           style={{
@@ -483,7 +483,7 @@ function VoteButtons({ options, onVote, label, isDanger }) {
     <div>
       <div style={{ fontSize:13, color:clr.text2, marginBottom:8 }}>{label}</div>
       <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-        {options.map(n => (
+        {(options||[]).map(n => (
           <button key={n} onClick={() => onVote(n)}
             style={{ ...btn(n===0?"warn":isDanger?"danger":"primary"), minWidth:52, padding:"8px 12px" }}>
             {n===0?"棄票":`${n} 號`}
@@ -496,7 +496,7 @@ function VoteButtons({ options, onVote, label, isDanger }) {
 
 function GodVoteMatrix({ votes, candidates }) {
   const grouped = {};
-  candidates.forEach(c => grouped[c]=[]);
+  (candidates||[]).forEach(c => grouped[c]=[]);
   grouped[0] = [];
   Object.entries(votes||{}).forEach(([voter,target]) => {
     const t = Number(target);
@@ -521,7 +521,7 @@ function GodVoteMatrix({ votes, candidates }) {
               <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
                 {voters.length===0
                   ? <span style={{ fontSize:12, color:clr.text3 }}>尚無</span>
-                  : voters.sort((a,b)=>a-b).map(v => (
+                  : (voters||[]).sort((a,b)=>a-b).map(v => (
                     <span key={v} style={{ background:clr.bg2, borderRadius:"var(--border-radius-md)", padding:"2px 8px", fontSize:12, color:clr.text2 }}>{v} 號</span>
                   ))}
               </div>
@@ -535,7 +535,7 @@ function GodVoteMatrix({ votes, candidates }) {
 
 function PlayerVoteMatrix({ votes, candidates }) {
   const grouped = {};
-  candidates.forEach(c => grouped[c]=[]);
+  (candidates||[]).forEach(c => grouped[c]=[]);
   grouped[0] = [];
   Object.entries(votes||{}).forEach(([voter,target]) => {
     const t = Number(target);
@@ -557,7 +557,7 @@ function PlayerVoteMatrix({ votes, candidates }) {
             </div>
             <div style={{ fontSize:13, color:clr.text2, paddingTop:4, flexShrink:0 }}>：</div>
             <div style={{ display:"flex", flexWrap:"wrap", gap:4, paddingTop:2 }}>
-              {voters.sort((a,b)=>a-b).map(v => (
+              {(voters||[]).sort((a,b)=>a-b).map(v => (
                 <span key={v} style={{ background:clr.bg2, borderRadius:"var(--border-radius-md)", padding:"3px 8px", fontSize:12, color:clr.text2 }}>{v} 號</span>
               ))}
             </div>
@@ -600,7 +600,7 @@ function ExileResult({ result }) {
           ? `🃏 ${exiled} 號（白癡）被放逐 → 亮出身份！不出局，失去投票權`
           : exiled
           ? `🔨 ${exiled} 號被放逐出局`
-          : `平票！${tied?.join("、")} 號均未被放逐`}
+          : `平票！${(tied||[]).join("、")} 號均未被放逐`}
       </div>
       {tally && (
         <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginTop:6 }}>
@@ -630,7 +630,7 @@ function PlayerVoteHistory({ voteHistory }) {
       </button>
       {open && (
         <div style={{ marginTop:8, display:"flex", flexDirection:"column", gap:10 }}>
-          {voteHistory.map((entry,i) => (
+          {(voteHistory||[]).map((entry,i) => (
             <div key={i} style={{ ...card, marginBottom:0 }}>
               <div style={{ fontSize:13, fontWeight:500, color:clr.text, marginBottom:10 }}>
                 {entry.label}
@@ -768,7 +768,7 @@ function NightHistory({ nightHistory, roles }) {
 
       {open && (
         <div style={{ marginTop:10, display:"flex", flexDirection:"column", gap:10 }}>
-          {[...nightHistory].reverse().map((entry, i) => {
+          {[...(nightHistory||[])].reverse().map((entry, i) => {
             const swap = entry.swap;
             const sr = entry.check
               ? getSeerResult(entry.check, swap, entry.roles||{}) : null;
@@ -780,10 +780,10 @@ function NightHistory({ nightHistory, roles }) {
                 <div style={{ fontSize:13, fontWeight:500, color:clr.text, marginBottom:8,
                   display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <span>{entry.label}</span>
-                  {entry.deaths?.length===0
+                  {(entry.deaths?.length||0)===0
                     ? <span style={{ fontSize:12, color:clr.success, background:clr.successBg, padding:"2px 8px", borderRadius:"var(--border-radius-md)" }}>平安夜</span>
                     : <span style={{ fontSize:12, color:clr.danger, background:clr.dangerBg, padding:"2px 8px", borderRadius:"var(--border-radius-md)" }}>
-                        出局：{entry.deaths.map(d=>d.num+" 號").join("、")}
+                        出局：{(entry.deaths||[]).map(d=>d.num+" 號").join("、")}
                       </span>
                   }
                 </div>
@@ -1999,7 +1999,7 @@ export default function App() {
             }
           }
 
-          r.log.push(deaths.length===0?"夜晚平安，無人出局":`夜晚出局：${deaths.map(d=>d.num+"號("+d.reason+")").join("、")}`);
+          r.log.push(deaths.length===0?"夜晚平安，無人出局":`夜晚出局：${(deaths||[]).map(d=>d.num+"號("+d.reason+")").join("、")}`);
           if (wasFirstNight) {
             r.phase="lobby";
             r.log.push("首夜結束，開始警長競選");
@@ -2059,7 +2059,7 @@ export default function App() {
           } else {
             r.exile.result={ tied, tally }; r.exile.published=true;
             r.voteHistory.push({ type:"exile", label:dayLabel, candidates:targets, votes:{...votes}, tally, tied });
-            r.phase="result"; r.log.push(`平票！${tied.join("、")} 號無人被放逐`);
+            r.phase="result"; r.log.push(`平票！${(tied||[]).join("、")} 號無人被放逐`);
           }
           r.dayCount++; break;
         }
@@ -2292,7 +2292,7 @@ export default function App() {
         <div style={{ padding:"10px 14px", borderRadius:"var(--border-radius-md)", marginBottom:12,
           background:room.night.deaths.length===0?clr.successBg:clr.dangerBg }}>
           <span style={{ fontSize:13, fontWeight:500, color:room.night.deaths.length===0?clr.success:clr.danger }}>
-            {room.night.deaths.length===0?"🌙 首夜平安，無人出局":`🌙 首夜出局：${room.night.deaths.map(d=>d.num+" 號").join("、")}`}
+            {room.night.deaths.length===0?"🌙 首夜平安，無人出局":`🌙 首夜出局：${(room.night.deaths||[]).map(d=>d.num+" 號").join("、")}`}
           </span>
         </div>
       )}
@@ -2499,7 +2499,7 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
           <div style={{ fontSize:14, fontWeight:500, color:clr.text, marginBottom:10 }}>🌙 夜間行動順序</div>
           <div style={{ fontSize:12, color:clr.text3, marginBottom:12 }}>{preset.desc}</div>
           <div style={{ display:"flex", flexDirection:"column", gap:6, marginBottom:16 }}>
-            {preset.nightOrder.map((s,i) => {
+            {(preset.nightOrder||[]).map((s,i) => {
               const role=ROLE_MAP[s.roleId], rc=ROLE_COLORS[s.roleId];
               return (
                 <div key={i} style={{ display:"flex", alignItems:"flex-start", gap:10,
@@ -2557,7 +2557,7 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
                     color:room.night.deaths.length===0?clr.success:clr.danger }}>
                     {room.night.deaths.length===0
                       ?"🌙 昨夜平安，無人出局"
-                      :`🌙 昨夜出局：${room.night.deaths.map(d=>d.num+"號("+d.reason+")").join("、")}`}
+                      :`🌙 昨夜出局：${(room.night.deaths||[]).map(d=>d.num+"號("+d.reason+")").join("、")}`}
                   </span>
                 </div>
               )}
@@ -2585,7 +2585,7 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
                 color:room.night.deaths.length===0?clr.success:clr.danger }}>
                 {room.night.deaths.length===0
                   ?"🌙 首夜平安，無人出局"
-                  :`🌙 首夜出局：${room.night.deaths.map(d=>d.num+"號("+d.reason+")").join("、")}`}
+                  :`🌙 首夜出局：${(room.night.deaths||[]).map(d=>d.num+"號("+d.reason+")").join("、")}`}
               </span>
             </div>
           )}
@@ -2929,7 +2929,7 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
                     color:room.night.deaths.length===0?clr.success:clr.danger }}>
                     {room.night.deaths.length===0
                       ?"🌙 昨夜平安夜，無人出局"
-                      :`🌙 昨夜出局：${room.night.deaths.map(d=>d.num+"號("+d.reason+")").join("、")}`}
+                      :`🌙 昨夜出局：${(room.night.deaths||[]).map(d=>d.num+"號("+d.reason+")").join("、")}`}
                   </span>
                 </div>
               )}
