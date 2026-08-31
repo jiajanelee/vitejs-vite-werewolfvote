@@ -55,6 +55,8 @@ const ROLE_MAP = {
   merchant:   { id:"merchant",   label:"奇蹟商人", emoji:"🛒", camp:"good" },
   secretlove: { id:"secretlove", label:"暗戀者",   emoji:"💘", camp:"good" },
   dreamer:    { id:"dreamer",    label:"攝夢人",   emoji:"🌙", camp:"good" },
+  dancer:     { id:"dancer",     label:"舞者",     emoji:"💃", camp:"good" },
+  mask:       { id:"mask",       label:"假面",     emoji:"🎭", camp:"wolf" },
   lonegirl:   { id:"lonegirl",   label:"覺醒孤獨少女", emoji:"🌟", camp:"good" },
   lucky:      { id:"lucky",      label:"幸運兒",   emoji:"🍀", camp:"good" },
   idiot:      { id:"idiot",      label:"白癡",     emoji:"🃏", camp:"good" },
@@ -73,6 +75,8 @@ const ROLE_COLORS = {
   merchant:   { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
   secretlove: { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
   dreamer:    { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
+  dancer:     { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
+  mask:       { bg:"var(--color-background-danger)",   text:"var(--color-text-danger)"   },
   lonegirl:   { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
   lucky:      { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
   idiot:      { bg:"var(--color-background-secondary)",text:"var(--color-text-secondary)"},
@@ -179,6 +183,38 @@ const PRESETS = [
     ],
   },
   {
+    id:"masquerade", label:"假面舞會",
+    desc:"假面 狼人×3 預言家 女巫 舞者 愚者 村民×4",
+    roles:["mask","wolf","wolf","wolf","seer","witch","dancer","idiot","village","village","village","village"],
+    nightOrder:[
+      { roleId:"dancer", label:"舞者確認身分（首夜）", identifyPlayers:true,
+        note:"首夜僅確認身分，無法發動技能", action:null },
+      { roleId:"mask",   label:"假面確認身分（首夜）", identifyPlayers:true,
+        note:"假面不與小狼見面；首夜僅確認身分，無法發動技能", action:null },
+      { roleId:"wolf",   label:"狼人睜眼（不含假面）", identifyPlayers:true,
+        action:{ key:"kill", label:"請選擇殺人目標", multi:false } },
+      { roleId:"witch",  label:"女巫睜眼", identifyPlayers:true,
+        action:{ key:"witch", label:"女巫行動", multi:false, isWitch:true } },
+      { roleId:"seer",   label:"預言家睜眼", identifyPlayers:true,
+        action:{ key:"check", label:"請選擇查驗目標", multi:false } },
+      { roleId:"idiot",  label:"愚者確認身分（首夜）", identifyPlayers:true, action:null },
+    ],
+    nightOrderLater:[
+      { roleId:"dancer", label:"舞者起舞", identifyPlayers:false,
+        note:"必須選擇三名一生未進過舞池的玩家；不足三人時技能失效",
+        action:{ key:"dance", label:"選擇三名玩家進入舞池", multi:true, isDance:true } },
+      { roleId:"mask",   label:"假面行動", identifyPlayers:false,
+        note:"查詢一人是否進入舞池，再向任意一人發放面具；查詢與發放目標均不可與昨夜相同",
+        action:{ key:"maskAction", label:"假面行動", multi:false, isMaskAction:true } },
+      { roleId:"wolf",   label:"狼人睜眼（不含假面）", identifyPlayers:false,
+        action:{ key:"kill", label:"請選擇殺人目標", multi:false } },
+      { roleId:"witch",  label:"女巫睜眼", identifyPlayers:false,
+        action:{ key:"witch", label:"女巫行動", multi:false, isWitch:true } },
+      { roleId:"seer",   label:"預言家睜眼", identifyPlayers:false,
+        action:{ key:"check", label:"請選擇查驗目標", multi:false } },
+    ],
+  },
+  {
     id:"mechawolf_spiritist", label:"機械狼通靈師",
     desc:"機械狼 狼人×3 通靈師 女巫 守衛 獵人 村民×4",
     roles:["mechawolf","wolf","wolf","wolf","spiritist","witch","guard","hunter","village","village","village","village"],
@@ -248,7 +284,7 @@ function getSeerResult(checkTarget, swap, roles) {
   };
 }
 
-function computeNightDeaths(night, lastDreamTarget) {
+function computeNightDeaths(night, lastDreamTarget, roles={}) {
   const swap = night.swap?.length === 2 ? night.swap : null;
 
   // 所有技能目標先經過魔術師互換轉換
@@ -258,12 +294,24 @@ function computeNightDeaths(night, lastDreamTarget) {
   const guardRaw      = night.guard?.[0] || null;
   // 機械狼模仿狼人時的第二刀
   const mechaKillRaw  = night.mechaKill?.[0];
+  const maskKillRaw   = night.maskKill?.[0];
   const guardTarget   = swapTarget(guardRaw, swap) || swapTarget(mechaGuardRaw, swap);
   const dreamTarget  = swapTarget(night.dream?.[0],        swap);
   const witchSave    = swapTarget(night.witchSave?.[0],    swap);
   const witchPoison  = swapTarget(night.witchPoison?.[0],  swap);
   const dreamerNum   = night.dreamerNum;   // 攝夢人自身號碼（不受 swap 影響）
   const killed = [];
+  const addKilled = (num, reason) => {
+    if (num && !killed.find(k=>k.num===Number(num))) killed.push({ num:Number(num), reason });
+  };
+  const roleNum = rid => {
+    const key = Object.entries(roles||{}).find(([,v])=>v===rid)?.[0];
+    return key ? Number(key.replace("p","")) : null;
+  };
+  const dancerNum = roleNum("dancer");
+  const maskNum   = roleNum("mask");
+  const danceMembers = (night.dance||[]).map(n=>swapTarget(Number(n),swap));
+  const dancerProtectsDance = dancerNum && danceMembers.includes(dancerNum);
 
   // ── 先計算攝夢人本晚是否被擊殺（被狼殺且未被救；或被女巫毒殺）──
   // 攝夢人被狼殺：守衛/女巫單獨救可活；雙重保護則死
@@ -285,16 +333,16 @@ function computeNightDeaths(night, lastDreamTarget) {
   // 攝夢人本晚出局 → 夢遊目標跟著死
   if (dreamTarget) {
     if (dreamerKilledThisNight) {
-      killed.push({ num: dreamTarget, reason: "攝夢人出局，夢遊者同死" });
+      addKilled(dreamTarget, "攝夢人出局，夢遊者同死");
     } else if (lastDreamTarget === dreamTarget) {
-      killed.push({ num: dreamTarget, reason: "連續夢遊兩晚死亡" });
+      addKilled(dreamTarget, "連續夢遊兩晚死亡");
     }
     // 否則夢遊目標本晚存活（免疫狼殺與毒藥）
   }
 
   // ── 攝夢人本晚出局 ──
   if (dreamerKilledThisNight && dreamerNum) {
-    killed.push({ num: dreamerNum, reason: "攝夢人出局" });
+    addKilled(dreamerNum, "攝夢人出局");
   }
 
   // ── 一般狼殺（非攝夢目標、非攝夢人） ──
@@ -302,18 +350,44 @@ function computeNightDeaths(night, lastDreamTarget) {
     const singleGuard = guardTarget === wolfTarget && witchSave !== wolfTarget;
     const singleWitch = witchSave === wolfTarget  && guardTarget !== wolfTarget;
     const saved = singleGuard || singleWitch;
-    if (!saved) killed.push({ num: wolfTarget, reason: "狼人擊殺" });
+    const danceProtected = dancerProtectsDance && danceMembers.includes(wolfTarget);
+    if (!saved && !danceProtected) addKilled(wolfTarget, "狼人擊殺");
+  }
+
+  // ── 假面帶刀：普狼全數出局後生效，視同狼刀，可被解藥或舞者參舞保護 ──
+  const maskKill = swapTarget(maskKillRaw, swap);
+  if (maskKill && maskKill !== dreamTarget && maskKill !== dreamerNum) {
+    const savedByWitch = witchSave === maskKill;
+    const danceProtected = dancerProtectsDance && danceMembers.includes(maskKill);
+    if (!savedByWitch && !danceProtected) addKilled(maskKill, "假面擊殺");
   }
 
   // ── 機械狼模仿狼人時的額外擊殺（不受守衛/女巫保護影響，但受攝夢保護） ──
   const mechaKill = swapTarget(mechaKillRaw, swap);
   if (mechaKill && mechaKill !== dreamTarget) {
-    killed.push({ num: mechaKill, reason: "機械狼擊殺" });
+    addKilled(mechaKill, "機械狼擊殺");
   }
 
   // ── 女巫毒殺（非攝夢目標、非攝夢人，攝夢人單獨處理過了） ──
-  if (witchPoison && witchPoison !== dreamTarget && witchPoison !== dreamerNum) {
-    killed.push({ num: witchPoison, reason: "女巫毒殺" });
+  if (witchPoison && witchPoison !== dreamTarget && witchPoison !== dreamerNum &&
+      witchPoison !== dancerNum && witchPoison !== maskNum) {
+    addKilled(witchPoison, "女巫毒殺");
+  }
+
+  // ── 舞池結算：面具使該玩家的陣營判定反轉，少數陣營當場死亡 ──
+  if (danceMembers.length===3 && new Set(danceMembers).size===3) {
+    const masked = swapTarget(night.maskTarget?.[0], swap);
+    const judged = danceMembers.map(num => {
+      let camp = ROLE_MAP[roles?.[`p${num}`]]?.camp;
+      if (num===masked && camp) camp = camp==="wolf" ? "good" : "wolf";
+      return { num, camp };
+    });
+    const goodCount = judged.filter(x=>x.camp==="good").length;
+    const wolfCount = judged.filter(x=>x.camp==="wolf").length;
+    if (goodCount>0 && wolfCount>0 && goodCount!==wolfCount) {
+      const minority = goodCount<wolfCount ? "good" : "wolf";
+      judged.filter(x=>x.camp===minority).forEach(x=>addKilled(x.num,"舞池少數陣營出局"));
+    }
   }
 
   // ── 幸運兒為狼陣營：技能無效，奇蹟商人死亡 ──
@@ -321,7 +395,7 @@ function computeNightDeaths(night, lastDreamTarget) {
   const merchantNum  = night.merchantNum;    // 奇蹟商人號碼
   if (luckyIsWolf && merchantNum) {
     if (!killed.find(k=>k.num===merchantNum)) {
-      killed.push({ num: merchantNum, reason: "幸運兒為狼陣營，奇蹟商人反噬死亡" });
+      addKilled(merchantNum, "幸運兒為狼陣營，奇蹟商人反噬死亡");
     }
   }
 
@@ -340,6 +414,9 @@ const defaultRoom = (code, presetId = "std") => ({
   night:null, nightStep:0,
   lastDreamTarget:null,  // 上一晚攝夢目標（用於連續夢遊判斷）
   swapHistory:[],        // 歷史互換記錄，魔術師用過的號碼不可再選
+  danceHistory:[],       // 曾進入舞池的玩家；每人一生只能進入一次
+  lastMaskQuery:null,    // 假面上一晚查詢的玩家
+  lastMaskTarget:null,   // 假面上一晚發放面具的玩家
   witchSaveUsed:false,   // 女巫解藥是否已用過
   witchPoisonUsed:false, // 女巫毒藥是否已用過
   lonegirlIdol:null,          // 覺醒孤獨少女選擇的偶像號碼
@@ -846,6 +923,18 @@ function NightHistory({ nightHistory, roles }) {
                   {entry.dream && (
                     <div>🌙 攝夢目標：{entry.dream} 號</div>
                   )}
+                  {entry.dance && (
+                    <div style={{ color:clr.info }}>💃 舞池：{entry.dance.join("、")} 號</div>
+                  )}
+                  {entry.maskQuery && (
+                    <div>🎭 假面查詢 {entry.maskQuery} 號：{entry.dance?.includes(entry.maskQuery)?"有":"沒有"}進入舞池</div>
+                  )}
+                  {entry.maskTarget && (
+                    <div style={{ color:clr.warn }}>🎭 面具發放：{entry.maskTarget} 號</div>
+                  )}
+                  {entry.maskKill && (
+                    <div style={{ color:clr.danger }}>🎭🔪 假面擊殺：{entry.maskKill} 號</div>
+                  )}
                   {entry.guard!=null && (
                     <div style={{ color:entry.guard==="空放"?clr.text3:clr.success }}>
                       🛡 守衛守護：{entry.guard==="空放" ? "空放" : `${swapTarget(entry.guard, swap)} 號`}
@@ -978,14 +1067,20 @@ function GodNightPanel({ room, godAction, loading }) {
       .filter(n=>aliveNums.includes(n));
 
   const dreamerNums = roleOwners("dreamer");
-  const wolfKill = night.kill?.[0] || na.kill?.[0];
+  const wolfKill = night.kill?.[0] || night.maskKill?.[0] || na.kill?.[0] || na.maskKill?.[0];
 
   // ── Build stepData and advance ───────────────────────────────────────────
   const advanceStep = async () => {
     if (isSaving) return;
-    setIsSaving(true);
     const step = order[stepIdx];
     const act  = step?.action;
+    const eligibleDance = aliveNums.filter(n=>!(room.danceHistory||[]).includes(n));
+    if (act?.isDance && eligibleDance.length>=3 && (na.dance||[]).length!==3) return;
+    if (act?.isMaskAction) {
+      if (!(na.maskQuery||[])[0]) return;
+      if (na.maskGiving!=="skip" && !(na.maskTarget||[])[0]) return;
+    }
+    setIsSaving(true);
     const stepData = {};
     if (act?.isWitch) {
       const choice = na.witchChoice;
@@ -1002,6 +1097,12 @@ function GodNightPanel({ room, godAction, loading }) {
       stepData.mimic = na.mimic||[];
     } else if (act?.isMimicReveal) {
       // Confirmation step only
+    } else if (act?.isDance) {
+      stepData.dance = eligibleDance.length>=3 ? (na.dance||[]) : [];
+    } else if (act?.isMaskAction) {
+      stepData.maskQuery = na.maskQuery||[];
+      stepData.maskTarget = na.maskGiving==="skip" ? [] : (na.maskTarget||[]);
+      stepData.maskKill = na.maskKill||[];
     } else if (act?.isMechaAction) {
       stepData.mechaAction = na.mechaAction ? [na.mechaAction] : [];
       if (na.mechaAction==="skill") {
@@ -1042,6 +1143,7 @@ function GodNightPanel({ room, godAction, loading }) {
         wolf2: na["id_wolf2"]||[],
         wolf:  na["id_wolf"]||[],
         mechawolf: na["id_mechawolf"]||[],
+        mask: na["id_mask"]||[],
       };
     }
 
@@ -1124,7 +1226,8 @@ function GodNightPanel({ room, godAction, loading }) {
         const hasAny = night.kill?.[0] || night.guard?.[0] || night.dream?.[0] ||
           night.witchSave?.[0] || night.witchPoison?.[0] || night.swap?.length===2 ||
           night.grant?.[0] || night.idol?.[0] || night.check?.[0] || night.mimic?.[0] ||
-          night.spiritCheck?.[0] || night.lucky?.[0] || room.lonegirlTransformed || showHunterStatus;
+          night.spiritCheck?.[0] || night.lucky?.[0] || night.dance?.length || night.maskQuery?.[0] ||
+          night.maskTarget?.[0] || night.maskKill?.[0] || room.lonegirlTransformed || showHunterStatus;
         if (!hasAny) return null;
         return (
           <div style={{ ...card, marginBottom:12, background:clr.bg2, border:`0.5px solid ${clr.border}` }}>
@@ -1158,6 +1261,18 @@ function GodNightPanel({ room, godAction, loading }) {
               )}
               {night.dream?.[0] && (
                 <div style={{ color:clr.info }}>🌙 攝夢目標：{night.dream[0]} 號</div>
+              )}
+              {night.dance?.length===3 && (
+                <div style={{ color:clr.info }}>💃 舞池：{night.dance.join("、")} 號</div>
+              )}
+              {night.maskQuery?.[0] && (
+                <div style={{ color:clr.text2 }}>🎭 假面查詢 {night.maskQuery[0]} 號：{night.dance?.includes(night.maskQuery[0])?"有":"沒有"}進入舞池</div>
+              )}
+              {night.maskTarget?.[0] && (
+                <div style={{ color:clr.warn }}>🎭 面具發放：{night.maskTarget[0]} 號</div>
+              )}
+              {night.maskKill?.[0] && (
+                <div style={{ color:clr.danger }}>🎭🔪 假面擊殺：{night.maskKill[0]} 號</div>
               )}
               {night.guard?.[0]!==undefined && (
                 <div style={{ color:clr.success }}>
@@ -1233,6 +1348,11 @@ function GodNightPanel({ room, godAction, loading }) {
         const wolfCount  = curPreset.roles.filter(rid=>rid==="wolf").length;
         const wolf2Sel   = na["id_wolf2"]||[];
         const wolfSel    = na["id_wolf"]||[];
+        const danceEligibleCount = aliveNums.filter(n=>!(room.danceHistory||[]).includes(n)).length;
+        const invalidDance = act?.isDance && danceEligibleCount>=3 && (na.dance||[]).length!==3;
+        const invalidMask = act?.isMaskAction && (!(na.maskQuery||[])[0] ||
+          (na.maskGiving!=="skip" && !(na.maskTarget||[])[0]));
+        const cannotAdvance = invalidDance || invalidMask;
 
         return (
           <div style={{ padding:"12px 14px", borderRadius:"var(--border-radius-md)",
@@ -1263,14 +1383,14 @@ function GodNightPanel({ room, godAction, loading }) {
                 </div>
                 {isWolfCamp ? (
                   <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                    {/* 機械狼步驟：只顯示機械狼號碼輸入，不顯示狼王/小狼 */}
-                    {currentStep.roleId==="mechawolf" ? (
+                    {/* 隱藏狼步驟：只顯示自己的號碼，不與狼王／小狼見面 */}
+                    {currentStep.roleId==="mechawolf" || currentStep.roleId==="mask" ? (
                       <div>
                         <div style={{ fontSize:12, color:clr.text2, marginBottom:4 }}>
-                          🤖 機械狼（限選 1 人，不與小狼見面）
+                          {currentStep.roleId==="mechawolf"?"🤖 機械狼":"🎭 假面"}（限選 1 人，不與小狼見面）
                         </div>
                         <NightPickBtn
-                          stateKey="id_mechawolf" multi={false}
+                          stateKey={currentStep.roleId==="mechawolf"?"id_mechawolf":"id_mask"} multi={false}
                           label="" opts={aliveNums}
                           na={na} setNightActions={setNightActions}
                         />
@@ -1479,6 +1599,78 @@ function GodNightPanel({ room, godAction, loading }) {
                   </div>
                 )}
 
+                {/* 舞者：第二夜起強制選三名從未進過舞池的玩家 */}
+                {act.isDance && (() => {
+                  const used = room.danceHistory||[];
+                  const eligible = aliveNums.filter(n=>!used.includes(n));
+                  const selected = na.dance||[];
+                  if (eligible.length<3) return (
+                    <div style={{ padding:"8px 10px", borderRadius:"var(--border-radius-md)", background:clr.warnBg,
+                      fontSize:13, color:clr.warn }}>
+                      可入舞池的存活玩家不足三人，本夜起舞技能失效
+                    </div>
+                  );
+                  return (
+                    <div>
+                      {used.length>0 && <div style={{ fontSize:12, color:clr.text3, marginBottom:6 }}>
+                        曾進入舞池（不可再選）：{used.join("、")} 號
+                      </div>}
+                      <NightPickBtn stateKey="dance" multi label="選擇三名玩家共舞（必選三人）"
+                        opts={eligible} na={na} setNightActions={setNightActions} />
+                      {selected.length!==3 && <div style={{ fontSize:12, color:selected.length>3?clr.danger:clr.warn, marginTop:6 }}>
+                        {selected.length>3?"只能選擇三人，請取消多餘玩家":`尚需選擇 ${3-selected.length} 人`}
+                      </div>}
+                      {selected.length===3 && (()=>{
+                        const dancer = roleOwners("dancer")[0];
+                        return <div style={{ fontSize:12, color:selected.includes(dancer)?clr.success:clr.text2, marginTop:6 }}>
+                          {selected.includes(dancer)?"💃 舞者參舞：舞池三人今晚免疫狼刀":"舞者未參舞：舞池不獲得狼刀保護"}
+                        </div>;
+                      })()}
+                    </div>
+                  );
+                })()}
+
+                {/* 假面：查詢舞池、發放面具，以及普狼全滅後帶刀 */}
+                {act.isMaskAction && (() => {
+                  const dance = night.dance||[];
+                  const normalWolvesAlive = roleOwners("wolf").length>0;
+                  const query = na.maskQuery?.[0];
+                  return (
+                    <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                      <div>
+                        <NightPickBtn stateKey="maskQuery" multi={false} label="查詢一名玩家今晚是否進入舞池"
+                          opts={aliveNums.filter(n=>n!==room.lastMaskQuery)} na={na} setNightActions={setNightActions} />
+                        {room.lastMaskQuery && <div style={{ fontSize:11, color:clr.text3, marginTop:4 }}>
+                          昨夜已查詢 {room.lastMaskQuery} 號，本夜不可再查
+                        </div>}
+                        {query && <div style={{ marginTop:6, padding:"6px 10px", borderRadius:"var(--border-radius-md)",
+                          background:dance.includes(query)?clr.successBg:clr.bg3,
+                          color:dance.includes(query)?clr.success:clr.text2, fontSize:13 }}>
+                          {query} 號今晚{dance.includes(query)?"有":"沒有"}進入舞池
+                        </div>}
+                      </div>
+                      <div>
+                        <div style={{ fontSize:12, color:clr.text2, marginBottom:4 }}>是否發放面具？</div>
+                        <NightChoiceBtn stateKey="maskGiving" choices={[
+                          {key:"give",label:"🎭 發放面具"},{key:"skip",label:"不發放面具"}
+                        ]} na={na} setNightActions={setNightActions} />
+                        {na.maskGiving==="give" && <NightPickBtn stateKey="maskTarget" multi={false}
+                          label="選擇戴上面具的玩家" opts={aliveNums.filter(n=>n!==room.lastMaskTarget)}
+                          na={na} setNightActions={setNightActions} />}
+                        {room.lastMaskTarget && na.maskGiving==="give" && <div style={{ fontSize:11, color:clr.text3, marginTop:4 }}>
+                          昨夜已給 {room.lastMaskTarget} 號面具，本夜不可重複
+                        </div>}
+                      </div>
+                      <div style={{ borderTop:`0.5px solid ${clr.border}`, paddingTop:10 }}>
+                        {normalWolvesAlive
+                          ? <div style={{ fontSize:12, color:clr.text3 }}>🔪 三名普狼尚未全數出局，假面帶刀未激活</div>
+                          : <NightPickBtn stateKey="maskKill" multi={false} label="🔪 普狼全數出局：選擇假面擊殺目標（可空刀）"
+                              opts={aliveNums} na={na} setNightActions={setNightActions} />}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* 通靈師：選目標，顯示具體身分（考慮機械狼模仿） */}
                 {act.isSpiritist && (
                   <div>
@@ -1668,10 +1860,12 @@ function GodNightPanel({ room, godAction, loading }) {
                 })()}
 
                 {/* 一般目標 */}
-                {!act.isWitch && !act.isSwap && !act.isGrant && !act.isGuard &&
+                {!act.isWitch && !act.isSwap && !act.isGrant && !act.isGuard && !act.isDance && !act.isMaskAction &&
                  !act.isSpiritist && !act.isMimic && !act.isMimicReveal && !act.isMechaAction && (
                   <div>
-                    <NightPickBtn stateKey={act.key} multi={act.multi||false} label={act.label} opts={aliveNums} na={na} setNightActions={setNightActions} />
+                    {room.preset==="masquerade" && currentStep.roleId==="wolf" && roleOwners("wolf").length===0
+                      ? <div style={{ fontSize:12, color:clr.text3 }}>三名普狼均已出局，本步驟無人行動</div>
+                      : <NightPickBtn stateKey={act.key} multi={act.multi||false} label={act.label} opts={aliveNums} na={na} setNightActions={setNightActions} />}
 
                     {/* 預言家：選完目標後即時顯示查驗結果 */}
                     {currentStep.roleId==="seer" && na.check?.[0] && (() => {
@@ -1781,7 +1975,7 @@ function GodNightPanel({ room, godAction, loading }) {
             })()}
 
             <div style={{ marginTop:14, display:"flex", gap:8, alignItems:"center" }}>
-              <button disabled={isSaving} onClick={advanceStep} style={{ ...btn("primary", isSaving) }}>
+              <button disabled={isSaving||cannotAdvance} onClick={advanceStep} style={{ ...btn("primary", isSaving||cannotAdvance) }}>
                 {isSaving ? "儲存中..." : stepIdx>=order.length-1?"完成最後一步 →":"下一步 →"}
               </button>
               {stepIdx>0 && (
@@ -1806,6 +2000,10 @@ function GodNightPanel({ room, godAction, loading }) {
             {night.swap?.length===2 && <div>🎩 魔術師互換：{night.swap[0]} 號 ↔ {night.swap[1]} 號</div>}
             {night.grant?.[0]       && <div>🛒 商人授予 {night.grant[0]} 號：{GRANT_SKILLS.find(g=>g.key===night.grantSkill?.[0])?.label||"技能"}</div>}
             {night.idol?.[0]        && <div>💘 偶像：{night.idol[0]} 號</div>}
+            {night.dance?.length===3 && <div>💃 舞池：{night.dance.join("、")} 號</div>}
+            {night.maskQuery?.[0]   && <div>🎭 查詢 {night.maskQuery[0]} 號：{night.dance?.includes(night.maskQuery[0])?"有":"沒有"}進入舞池</div>}
+            {night.maskTarget?.[0]  && <div>🎭 面具發放：{night.maskTarget[0]} 號</div>}
+            {night.maskKill?.[0]    && <div>🎭🔪 假面擊殺：{night.maskKill[0]} 號</div>}
             {room.lonegirlTransformed && room.lonegirlNewRole && (() => {
               const lonegirlNum = Object.entries(room.roles||{})
                 .find(([,v])=>v===room.lonegirlNewRole && room.lonegirlNewRole!=="lonegirl")?.[0]?.replace("p","");
@@ -1935,6 +2133,9 @@ export default function App() {
       // Ensure all nested objects exist (Firebase may omit empty objects)
       if (!r.roles)       r.roles       = {};
       if (!r.swapHistory)     r.swapHistory     = [];
+      if (!r.danceHistory)    r.danceHistory    = [];
+      if (r.lastMaskQuery  === undefined) r.lastMaskQuery  = null;
+      if (r.lastMaskTarget === undefined) r.lastMaskTarget = null;
       if (r.witchSaveUsed   === undefined) r.witchSaveUsed   = false;
       if (r.witchPoisonUsed === undefined) r.witchPoisonUsed = false;
       if (r.idiotRevealed      === undefined) r.idiotRevealed      = false;
@@ -2050,6 +2251,7 @@ export default function App() {
             wi.wolf2.forEach(n    => { r.roles[`p${n}`]="wolf2";    });
             wi.wolf.forEach(n     => { r.roles[`p${n}`]="wolf";     });
             (wi.mechawolf||[]).forEach(n=>{ r.roles[`p${n}`]="mechawolf"; });
+            (wi.mask||[]).forEach(n=>{ r.roles[`p${n}`]="mask"; });
             const cleaned = { ...d };
             delete cleaned._wolfIdentify;
             Object.entries(cleaned).forEach(([k,v]) => r.night[k]=v);
@@ -2069,13 +2271,21 @@ export default function App() {
         }
 
         case "resolveNight": {
-          const deaths=computeNightDeaths(r.night, r.lastDreamTarget||null);
+          const deaths=computeNightDeaths(r.night, r.lastDreamTarget||null, r.roles||{});
           // Update lastDreamTarget for next night's consecutive-dream check
           r.lastDreamTarget = r.night?.dream?.[0] || null;
           // Save magician swap to history (used numbers cannot be reused)
           if (r.night?.swap?.length===2) {
             if (!r.swapHistory) r.swapHistory=[];
             r.swapHistory.push(...r.night.swap);
+          }
+          // 舞池與假面限制皆跨夜保存
+          if (r.night?.dance?.length===3) {
+            r.danceHistory.push(...r.night.dance.filter(n=>!r.danceHistory.includes(n)));
+          }
+          if (r.night?.maskQuery?.[0]) {
+            r.lastMaskQuery = r.night.maskQuery[0];
+            r.lastMaskTarget = r.night.maskTarget?.[0] || null;
           }
           // Mark witch potions as used if they were used this night
           if (r.night?.witchSave?.[0])   r.witchSaveUsed   = true;
@@ -2112,6 +2322,10 @@ export default function App() {
             mechaGuard:   r.night.mechaGuard?.[0]   || null,
             mechaSpiritCheck: r.night.mechaSpiritCheck?.[0] || null,
             mechaKill:    r.night.mechaKill?.[0]    || null,
+            dance:        r.night.dance?.length===3 ? r.night.dance : null,
+            maskQuery:    r.night.maskQuery?.[0]    || null,
+            maskTarget:   r.night.maskTarget?.[0]   || null,
+            maskKill:     r.night.maskKill?.[0]     || null,
             lonegirlTransformed: r.lonegirlTransformed || false,
             lonegirlNewRole:     r.lonegirlNewRole     || null,
             roles: { ...r.roles },
