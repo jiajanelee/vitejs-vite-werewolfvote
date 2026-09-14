@@ -210,25 +210,20 @@ const PRESETS = [
   },
   {
     id:"changeling_wolfking", label:"百變狼王",
-    desc:"五神候選（預言家 女巫 獵人 攝夢人 訓熊師）隨機一人轉為百變狼王，另有狼人×3、村民×4",
+    desc:"建房時由五神候選（預言家 女巫 獵人 攝夢人 訓熊師）隨機一職轉為百變狼王，另有狼人×3、村民×4",
     roles:["seer","witch","hunter","dreamer","beartrainer","wolf","wolf","wolf","village","village","village","village"],
     nightOrder:[
-      { roleId:"seer",        label:"確認預言家位置", identifyPlayers:true, action:null },
-      { roleId:"witch",       label:"確認女巫位置", identifyPlayers:true, action:null },
-      { roleId:"hunter",      label:"確認獵人位置", identifyPlayers:true, action:null },
-      { roleId:"dreamer",     label:"確認攝夢人位置", identifyPlayers:true, action:null },
-      { roleId:"beartrainer", label:"確認訓熊師位置", identifyPlayers:true, action:null },
-      { roleId:"changeling",  label:"隨機選出百變狼王並通知變身", identifyPlayers:false,
-        action:{ key:"changelingSelect", label:"從五個神職位置隨機抽選", isChangelingSelect:true } },
       { roleId:"wolf", label:"三名小狼睜眼", identifyPlayers:true,
         action:{ key:"variantWolfTeam", label:"請選擇狼刀目標", isVariantWolfTeam:true } },
-      { roleId:"witch", label:"女巫行動", identifyPlayers:false, skipFirstNightIdentify:true,
+      { roleId:"witch", label:"女巫行動", identifyPlayers:true,
         action:{ key:"witch", label:"女巫行動", isWitch:true } },
-      { roleId:"seer", label:"預言家行動", identifyPlayers:false, skipFirstNightIdentify:true,
-        action:{ key:"variantSeer", label:"查驗目標", isVariantSeer:true } },
-      { roleId:"hunter", label:"獵人確認開槍狀態", identifyPlayers:false, skipFirstNightIdentify:true, action:null },
-      { roleId:"dreamer", label:"攝夢人行動", identifyPlayers:false, skipFirstNightIdentify:true,
+      { roleId:"beartrainer", label:"訓熊師行動", identifyPlayers:true,
+        action:{ key:"variantBearTrainer", label:"確認熊叫與魅惑狀態", isVariantBearTrainer:true } },
+      { roleId:"dreamer", label:"攝夢人行動", identifyPlayers:true,
         action:{ key:"dream", label:"請選擇攝夢目標（必選，不可空放）", multi:false } },
+      { roleId:"hunter", label:"獵人確認開槍狀態", identifyPlayers:true, action:null },
+      { roleId:"seer", label:"預言家行動", identifyPlayers:true,
+        action:{ key:"variantSeer", label:"查驗目標", isVariantSeer:true } },
     ],
     nightOrderLater:[
       { roleId:"changeling", label:"百變狼王狀態確認", identifyPlayers:false,
@@ -1336,6 +1331,8 @@ function GodNightPanel({ room, godAction, loading }) {
       stepData.changelingWolfForm = na.changelingForm ? [na.changelingForm] : [];
     } else if (act?.isChangelingStatus) {
       if (room.changelingWolfForm==="beartrainer") stepData.changelingCharm = na.changelingCharm||[];
+    } else if (act?.isVariantBearTrainer) {
+      if (room.changelingWolfForm==="beartrainer") stepData.changelingCharm = na.changelingCharm||[];
     } else if (act?.isVariantWolfTeam) {
       const smallWolvesAlive = roleOwners("wolf").length>0 || (isFirstNight && (na["id_wolf"]||[]).length>0);
       if (smallWolvesAlive) stepData.kill = na.kill||[];
@@ -1367,7 +1364,10 @@ function GodNightPanel({ room, godAction, loading }) {
       stepData[act.key] = na[act.key]||[];
     }
 
-    if (dreamerNums.length) stepData.dreamerNum = dreamerNums[0];
+    const currentDreamerNum = isFirstNight && step?.roleId==="dreamer"
+      ? (na["id_dreamer"]||[])[0]
+      : dreamerNums[0];
+    if (currentDreamerNum) stepData.dreamerNum = currentDreamerNum;
 
     // Lucky wolf check
     if (currentStep?.roleId==="lucky") {
@@ -1611,7 +1611,9 @@ function GodNightPanel({ room, godAction, loading }) {
           (na.maskGiving!=="skip" && !(na.maskTarget||[])[0]));
         const invalidChangeling = act?.isChangelingSelect && !na.changelingNum;
         const invalidWitch = act?.isWitch && na.witchChoice==="poison" && !(na.witchTarget||[])[0];
-        const cannotAdvance = invalidDance || invalidMask || invalidChangeling || invalidWitch;
+        const invalidChangelingIdentity = room.preset==="changeling_wolfking" && isFirstNight && currentStep.identifyPlayers &&
+          (currentStep.roleId==="wolf" ? wolfSel.length!==wolfCount : (na[`id_${currentStep.roleId}`]||[]).length!==1);
+        const cannotAdvance = invalidDance || invalidMask || invalidChangeling || invalidWitch || invalidChangelingIdentity;
 
         return (
           <div style={{ padding:"12px 14px", borderRadius:"var(--border-radius-md)",
@@ -1628,6 +1630,14 @@ function GodNightPanel({ room, godAction, loading }) {
               <div style={{ fontSize:12, color:clr.text2, marginBottom:8,
                 padding:"4px 8px", borderRadius:"var(--border-radius-md)", background:"rgba(0,0,0,0.04)" }}>
                 📌 {currentStep.note}
+              </div>
+            )}
+            {isFirstNight && room.preset==="changeling_wolfking" &&
+             room.changelingWolfForm===currentStep.roleId && (
+              <div style={{ marginBottom:10, padding:"9px 11px", borderRadius:"var(--border-radius-md)",
+                background:clr.dangerBg, border:`1.5px solid ${clr.danger}`, color:clr.danger }}>
+                <div style={{fontSize:13,fontWeight:700}}>🃏 本局此神職已轉變為百變狼王</div>
+                <div style={{fontSize:12,marginTop:3}}>請將本步驟登記的玩家視為狼人陣營，並依百變{role?.label}規則行動。</div>
               </div>
             )}
 
@@ -1690,7 +1700,9 @@ function GodNightPanel({ room, godAction, loading }) {
                     stateKey={`id_${currentStep.roleId}`}
                     multi={false}
                     label={`${role?.label} 是幾號？`}
-                    opts={aliveNums}
+                    opts={room.preset==="changeling_wolfking"
+                      ? aliveNums.filter(n=>!room.roles?.[`p${n}`] || room.roles?.[`p${n}`]===currentStep.roleId)
+                      : aliveNums}
                     na={na}
                     setNightActions={setNightActions}
                   />
@@ -1767,7 +1779,7 @@ function GodNightPanel({ room, godAction, loading }) {
                   );
                 })()}
 
-                {/* 百變狼王：首夜抽選、入隊狀態與五種變體能力 */}
+                {/* 百變狼王：入隊狀態與五種變體能力 */}
                 {act.isChangelingSelect && (()=>{
                   const candidates=Object.entries(room.roles||{})
                     .filter(([,rid])=>CHANGELING_FORMS.includes(rid))
@@ -1797,6 +1809,18 @@ function GodNightPanel({ room, godAction, loading }) {
                     {room.changelingWolfForm==="beartrainer" && <div style={{marginTop:10}}>
                       <NightPickBtn stateKey="changelingCharm" multi={false} label="🐻 選擇本夜魅惑目標（可空放）" opts={aliveNums.filter(n=>n!==Number(room.changelingWolfNum))} na={na} setNightActions={setNightActions}/>
                     </div>}
+                  </div>;
+                })()}
+
+                {act.isVariantBearTrainer && (()=>{
+                  if (room.changelingWolfForm!=="beartrainer") return (
+                    <div style={{fontSize:12,color:clr.text3}}>正常訓熊師首夜僅確認身分，天亮時系統會自動結算熊叫。</div>
+                  );
+                  const bearNum=(na["id_beartrainer"]||[])[0];
+                  return <div>
+                    <div style={{fontSize:12,color:clr.danger,marginBottom:8}}>百變訓熊師存活時必定熊叫，並可選擇一名玩家作為魅惑對象。</div>
+                    <NightPickBtn stateKey="changelingCharm" multi={false} label="🐻 選擇首夜魅惑目標（可空放）"
+                      opts={aliveNums.filter(n=>n!==Number(bearNum))} na={na} setNightActions={setNightActions}/>
                   </div>;
                 })()}
 
@@ -2181,7 +2205,8 @@ function GodNightPanel({ room, godAction, loading }) {
                 {/* 一般目標 */}
                 {!act.isWitch && !act.isSwap && !act.isGrant && !act.isGuard && !act.isDance && !act.isMaskAction &&
                  !act.isSpiritist && !act.isMimic && !act.isMimicReveal && !act.isMechaAction &&
-                 !act.isChangelingSelect && !act.isChangelingStatus && !act.isVariantWolfTeam && !act.isVariantSeer && (
+                 !act.isChangelingSelect && !act.isChangelingStatus && !act.isVariantBearTrainer &&
+                 !act.isVariantWolfTeam && !act.isVariantSeer && (
                   <div>
                     {room.preset==="masquerade" && currentStep.roleId==="wolf" && roleOwners("wolf").length===0
                       ? <div style={{ fontSize:12, color:clr.text3 }}>三名普狼均已出局，本步驟無人行動</div>
@@ -2249,7 +2274,7 @@ function GodNightPanel({ room, godAction, loading }) {
                 return <div style={{ fontSize:12, color:clr.text3, fontStyle:"italic" }}>此角色夜晚無行動，請閉眼</div>;
               }
               // 獵人第一步「確認身分」（identifyPlayers:true）：只輸入號碼，不顯示開槍狀態
-              if (currentStep.identifyPlayers) {
+              if (currentStep.identifyPlayers && room.preset!=="changeling_wolfking") {
                 return <div style={{ fontSize:12, color:clr.text3 }}>身分確認完畢後，請閉眼等待後續通知</div>;
               }
               // 獵人確認開槍狀態
@@ -2422,6 +2447,9 @@ export default function App() {
       const presetId = godInput.selectedPreset || "std";
       const preset = PRESETS.find(p=>p.id===presetId)||PRESETS[0];
       const r      = defaultRoom(code, presetId);
+      if (presetId==="changeling_wolfking") {
+        r.changelingWolfForm = CHANGELING_FORMS[Math.floor(Math.random()*CHANGELING_FORMS.length)];
+      }
       r.godPasswordSalt = createPasswordSalt();
       r.godPasswordHash = await hashGodPassword(createGodPassword,r.godPasswordSalt);
       r.log.push(`建立對局，版型：${preset.label}`);
@@ -2601,6 +2629,9 @@ export default function App() {
         }
 
         case "startNight": {
+          if (r.preset==="changeling_wolfking" && !r.changelingWolfForm) {
+            r.changelingWolfForm = CHANGELING_FORMS[Math.floor(Math.random()*CHANGELING_FORMS.length)];
+          }
           r.phase="night"; r.nightStep=0;
           r.night={ kill:[], guard:[], check:[], witchSave:[], witchPoison:[], hunter:[] };
           r.log.push(`第 ${r.dayCount} 夜開始`); break;
@@ -2626,6 +2657,10 @@ export default function App() {
             if (payload.roleId && payload.nums?.length) {
               payload.nums.forEach(n => { r.roles[`p${n}`]=payload.roleId; });
             }
+          }
+          // 百變狼王的轉變神職已在建房時抽定；該神職首夜睜眼登記時再綁定玩家號碼。
+          if (r.preset==="changeling_wolfking" && payload.roleId===r.changelingWolfForm && payload.nums?.[0]) {
+            r.changelingWolfNum = Number(payload.nums[0]);
           }
           // Save lonegirl idol selection to room level
           if (r.night?.idol?.[0] && !r.lonegirlIdol) {
