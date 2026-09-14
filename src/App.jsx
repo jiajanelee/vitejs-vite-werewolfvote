@@ -57,6 +57,8 @@ const ROLE_MAP = {
   dreamer:    { id:"dreamer",    label:"攝夢人",   emoji:"🌙", camp:"good" },
   dancer:     { id:"dancer",     label:"舞者",     emoji:"💃", camp:"good" },
   mask:       { id:"mask",       label:"假面",     emoji:"🎭", camp:"wolf" },
+  beartrainer:{ id:"beartrainer",label:"訓熊師",   emoji:"🐻", camp:"good" },
+  changeling: { id:"changeling", label:"百變狼王", emoji:"🃏", camp:"wolf" },
   lonegirl:   { id:"lonegirl",   label:"覺醒孤獨少女", emoji:"🌟", camp:"good" },
   lucky:      { id:"lucky",      label:"幸運兒",   emoji:"🍀", camp:"good" },
   idiot:      { id:"idiot",      label:"白癡",     emoji:"🃏", camp:"good" },
@@ -77,6 +79,8 @@ const ROLE_COLORS = {
   dreamer:    { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
   dancer:     { bg:"var(--color-background-info)",     text:"var(--color-text-info)"     },
   mask:       { bg:"var(--color-background-danger)",   text:"var(--color-text-danger)"   },
+  beartrainer:{ bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
+  changeling: { bg:"var(--color-background-danger)",   text:"var(--color-text-danger)"   },
   lonegirl:   { bg:"var(--color-background-warning)",  text:"var(--color-text-warning)"  },
   lucky:      { bg:"var(--color-background-success)",  text:"var(--color-text-success)"  },
   idiot:      { bg:"var(--color-background-secondary)",text:"var(--color-text-secondary)"},
@@ -183,6 +187,42 @@ const PRESETS = [
     ],
   },
   {
+    id:"changeling_wolfking", label:"百變狼王",
+    desc:"五神候選（預言家 女巫 獵人 攝夢人 訓熊師）隨機一人轉為百變狼王，另有狼人×3、村民×4",
+    roles:["seer","witch","hunter","dreamer","beartrainer","wolf","wolf","wolf","village","village","village","village"],
+    nightOrder:[
+      { roleId:"seer",        label:"確認預言家位置", identifyPlayers:true, action:null },
+      { roleId:"witch",       label:"確認女巫位置", identifyPlayers:true, action:null },
+      { roleId:"hunter",      label:"確認獵人位置", identifyPlayers:true, action:null },
+      { roleId:"dreamer",     label:"確認攝夢人位置", identifyPlayers:true, action:null },
+      { roleId:"beartrainer", label:"確認訓熊師位置", identifyPlayers:true, action:null },
+      { roleId:"changeling",  label:"隨機選出百變狼王並通知變身", identifyPlayers:false,
+        action:{ key:"changelingSelect", label:"從五個神職位置隨機抽選", isChangelingSelect:true } },
+      { roleId:"wolf", label:"三名小狼睜眼", identifyPlayers:true,
+        action:{ key:"variantWolfTeam", label:"請選擇狼刀目標", isVariantWolfTeam:true } },
+      { roleId:"witch", label:"女巫行動", identifyPlayers:false, skipFirstNightIdentify:true,
+        action:{ key:"witch", label:"女巫行動", isWitch:true } },
+      { roleId:"seer", label:"預言家行動", identifyPlayers:false, skipFirstNightIdentify:true,
+        action:{ key:"variantSeer", label:"查驗目標", isVariantSeer:true } },
+      { roleId:"hunter", label:"獵人確認開槍狀態", identifyPlayers:false, skipFirstNightIdentify:true, action:null },
+      { roleId:"dreamer", label:"攝夢人行動", identifyPlayers:false, skipFirstNightIdentify:true,
+        action:{ key:"dream", label:"請選擇攝夢目標（必選，不可空放）", multi:false } },
+    ],
+    nightOrderLater:[
+      { roleId:"changeling", label:"百變狼王狀態確認", identifyPlayers:false,
+        action:{ key:"changelingStatus", label:"確認入隊與特殊技能", isChangelingStatus:true } },
+      { roleId:"wolf", label:"狼隊行動", identifyPlayers:false,
+        action:{ key:"variantWolfTeam", label:"請選擇狼刀目標", isVariantWolfTeam:true } },
+      { roleId:"witch", label:"女巫行動", identifyPlayers:false,
+        action:{ key:"witch", label:"女巫行動", isWitch:true } },
+      { roleId:"seer", label:"預言家行動", identifyPlayers:false,
+        action:{ key:"variantSeer", label:"查驗目標", isVariantSeer:true } },
+      { roleId:"hunter", label:"獵人確認開槍狀態", identifyPlayers:false, action:null },
+      { roleId:"dreamer", label:"攝夢人行動", identifyPlayers:false,
+        action:{ key:"dream", label:"請選擇攝夢目標（必選，不可空放）", multi:false } },
+    ],
+  },
+  {
     id:"masquerade", label:"假面舞會",
     desc:"假面 狼人×3 預言家 女巫 舞者 愚者 村民×4",
     roles:["mask","wolf","wolf","wolf","seer","witch","dancer","idiot","village","village","village","village"],
@@ -271,20 +311,22 @@ function swapTarget(num, swap) {
 
 // 取得預言家查驗結果（考慮魔術師互換）
 // 查驗 target → 實際看到的是 swapTarget(target) 的陣營
-function getSeerResult(checkTarget, swap, roles) {
+function getSeerResult(checkTarget, swap, roles, changelingWolfNum=null) {
   const realTarget = swapTarget(checkTarget, swap);
   const roleId = roles?.[`p${realTarget}`];
-  const camp = ROLE_MAP[roleId]?.camp;
+  // 預言家是首夜神狼行動的最後一環：仍未登記角色的座位就是村民，判定為好人。
+  // 後續夜晚所有身分均已補齊，因此這個 fallback 也不會掩蓋既有角色。
+  const camp = Number(realTarget)===Number(changelingWolfNum) ? "wolf" : (ROLE_MAP[roleId]?.camp || "good");
   return {
     checkTarget,           // 預言家查驗的號碼
     realTarget,            // 實際看到底牌的號碼（經 swap 後）
     swapped: realTarget !== checkTarget,
-    camp: camp || null,    // "wolf" | "good" | null
+    camp,                  // "wolf" | "good"
     isWolf: camp === "wolf",
   };
 }
 
-function computeNightDeaths(night, lastDreamTarget, roles={}) {
+function computeNightDeaths(night, lastDreamTarget, roles={}, special={}) {
   const swap = night.swap?.length === 2 ? night.swap : null;
 
   // 所有技能目標先經過魔術師互換轉換
@@ -295,6 +337,8 @@ function computeNightDeaths(night, lastDreamTarget, roles={}) {
   // 機械狼模仿狼人時的第二刀
   const mechaKillRaw  = night.mechaKill?.[0];
   const maskKillRaw   = night.maskKill?.[0];
+  const changelingTeamKillRaw = night.changelingTeamKill?.[0];
+  const changelingSeerKillRaw = night.changelingSeerKill?.[0];
   const guardTarget   = swapTarget(guardRaw, swap) || swapTarget(mechaGuardRaw, swap);
   const dreamTarget  = swapTarget(night.dream?.[0],        swap);
   const witchSave    = swapTarget(night.witchSave?.[0],    swap);
@@ -318,12 +362,16 @@ function computeNightDeaths(night, lastDreamTarget, roles={}) {
   let dreamerKilledThisNight = false;
   if (dreamerNum) {
     const dreamerWolfKilled = wolfTarget === dreamerNum;
+    const dreamerChangelingTeamKilled = swapTarget(changelingTeamKillRaw,swap) === dreamerNum;
+    const dreamerChangelingSeerKilled = swapTarget(changelingSeerKillRaw,swap) === dreamerNum;
     const dreamerPoisoned   = witchPoison === dreamerNum;
     if (dreamerWolfKilled) {
       const singleGuard = guardTarget === dreamerNum && witchSave !== dreamerNum;
       const singleWitch = witchSave === dreamerNum  && guardTarget !== dreamerNum;
       if (!singleGuard && !singleWitch) dreamerKilledThisNight = true;
     }
+    if (dreamerChangelingTeamKilled && witchSave!==dreamerNum) dreamerKilledThisNight = true;
+    if (dreamerChangelingSeerKilled) dreamerKilledThisNight = true;
     if (dreamerPoisoned) dreamerKilledThisNight = true;
   }
 
@@ -360,6 +408,17 @@ function computeNightDeaths(night, lastDreamTarget, roles={}) {
     const savedByWitch = witchSave === maskKill;
     const danceProtected = dancerProtectsDance && danceMembers.includes(maskKill);
     if (!savedByWitch && !danceProtected) addKilled(maskKill, "假面擊殺");
+  }
+
+  // ── 百變狼王刀權：入隊刀可被女巫救；百變預言家於查驗環節的額外刀不可被救 ──
+  const changelingTeamKill = swapTarget(changelingTeamKillRaw,swap);
+  if (changelingTeamKill && changelingTeamKill!==dreamTarget && changelingTeamKill!==dreamerNum) {
+    const savedByWitch = witchSave===changelingTeamKill;
+    if (!savedByWitch) addKilled(changelingTeamKill,"百變狼王擊殺");
+  }
+  const changelingSeerKill = swapTarget(changelingSeerKillRaw,swap);
+  if (changelingSeerKill && changelingSeerKill!==dreamTarget && changelingSeerKill!==dreamerNum) {
+    addKilled(changelingSeerKill,"百變預言家額外擊殺");
   }
 
   // ── 機械狼模仿狼人時的額外擊殺（不受守衛/女巫保護影響，但受攝夢保護） ──
@@ -399,7 +458,99 @@ function computeNightDeaths(night, lastDreamTarget, roles={}) {
     }
   }
 
+
+  // 百變訓熊師死亡時，當晚魅惑對象跟著出局
+  if (special.changelingWolfForm==="beartrainer" && special.changelingWolfNum &&
+      killed.find(k=>k.num===Number(special.changelingWolfNum)) && night.changelingCharm?.[0]) {
+    addKilled(night.changelingCharm[0],"百變訓熊師死亡，魅惑對象同死");
+  }
+
   return killed;
+}
+
+// ── 覺醒孤獨少女與全局勝負結算 ───────────────────────────────────────────
+const GOD_ROLE_IDS = new Set([
+  "seer","spiritist","witch","hunter","guard","magician","merchant","dreamer","idiot","dancer","beartrainer",
+]);
+const CIVILIAN_ROLE_IDS = new Set(["village","secretlove","lonegirl","lucky"]);
+
+function playerIsDead(room, num) {
+  return !!Object.values(room.players||{}).find(p=>p.num===Number(num))?.dead;
+}
+
+function computeBearRoar(room) {
+  const bearKey = Object.entries(room.roles||{}).find(([,v])=>v==="beartrainer")?.[0];
+  const bearNum = bearKey ? Number(bearKey.replace("p","")) : null;
+  if (!bearNum || playerIsDead(room,bearNum)) return false;
+  if (bearNum===Number(room.changelingWolfNum)) return true;
+
+  const alive = Array.from({length:PLAYER_COUNT},(_,i)=>i+1).filter(n=>!playerIsDead(room,n));
+  const idx = alive.indexOf(bearNum);
+  if (idx<0 || alive.length<2) return false;
+  const neighbors = new Set([alive[(idx-1+alive.length)%alive.length],alive[(idx+1)%alive.length]]);
+  return [...neighbors].some(n=>n===Number(room.changelingWolfNum) || ROLE_MAP[room.roles?.[`p${n}`]]?.camp==="wolf");
+}
+
+function inheritLonegirlRole(room, idolRoleId, lonegirlNum) {
+  if (!idolRoleId || !lonegirlNum || playerIsDead(room,lonegirlNum)) return false;
+  room.lonegirlTransformed = true;
+  room.lonegirlNewRole = idolRoleId;
+  room.roles[`p${lonegirlNum}`] = idolRoleId;
+
+  if (idolRoleId === "witch") {
+    // 覺女繼承女巫：沒有解藥，但獲得一瓶全新的毒藥
+    room.witchSaveUsed = true;
+    room.witchPoisonUsed = false;
+    room.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承女巫身份，獲得一瓶全新毒藥（無解藥）`);
+  } else if (idolRoleId === "seer") {
+    room.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承預言家身份，獲得查驗技能`);
+  } else if (idolRoleId === "hunter") {
+    room.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承獵人身份，獲得獵捕技能`);
+  } else if (idolRoleId === "dreamer") {
+    // 沿用目前版型規則；攝夢連續目標規則可另行調整
+    room.lastDreamTarget = null;
+    room.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承攝夢人身份，連續攝夢計數重置`);
+  } else {
+    room.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承 ${ROLE_MAP[idolRoleId]?.label||idolRoleId} 身份`);
+  }
+  return true;
+}
+
+function applyPendingLonegirlInheritance(room) {
+  const pending = room.pendingLonegirlInheritance;
+  if (!pending || room.lonegirlTransformed) return false;
+  room.pendingLonegirlInheritance = null;
+  return inheritLonegirlRole(room, pending.roleId, pending.lonegirlNum);
+}
+
+function settleGame(room) {
+  if (room.gameResult) return true;
+  if (!room.rolesRevealed || room.pendingLonegirlInheritance) return false;
+
+  const groups = { wolf:[], god:[], civilian:[] };
+  Object.entries(room.roles||{}).forEach(([key,roleId])=>{
+    const num = Number(key.replace("p",""));
+    if (num===Number(room.changelingWolfNum) || ROLE_MAP[roleId]?.camp==="wolf") groups.wolf.push(num);
+    else if (GOD_ROLE_IDS.has(roleId)) groups.god.push(num);
+    else if (CIVILIAN_ROLE_IDS.has(roleId)) groups.civilian.push(num);
+  });
+  const allDead = nums => nums.length>0 && nums.every(n=>playerIsDead(room,n));
+
+  let winner=null, reason=null;
+  // 屠邊規則：神職或平民先被屠光時，狼人優先獲勝
+  if (allDead(groups.god)) {
+    winner="wolf"; reason="全部神職出局";
+  } else if (allDead(groups.civilian)) {
+    winner="wolf"; reason="全部平民出局";
+  } else if (allDead(groups.wolf)) {
+    winner="good"; reason="全部狼人出局";
+  }
+  if (!winner) return false;
+
+  room.gameResult = { winner, reason, dayCount:room.dayCount, settledAt:Date.now() };
+  room.phase = "gameOver";
+  room.log.push(`🏁 遊戲結束：${winner==="wolf"?"狼人陣營":"好人陣營"}獲勝（${reason}）`);
+  return true;
 }
 
 const defaultRoom = (code, presetId = "std") => ({
@@ -422,6 +573,10 @@ const defaultRoom = (code, presetId = "std") => ({
   lonegirlIdol:null,          // 覺醒孤獨少女選擇的偶像號碼
   lonegirlTransformed:false,  // 是否已觸發轉變
   lonegirlNewRole:null,       // 轉變後的角色 id
+  pendingLonegirlInheritance:null, // 首夜偶像死亡時，等待警徽落地後繼承
+  gameResult:null,            // 屠邊規則的最終勝負
+  changelingWolfNum:null,     // 百變狼王玩家號碼
+  changelingWolfForm:null,    // 被轉化的原神職 roleId
   wolfBoomCount:0,        // 狼人自爆累計次數（連續兩次警徽流失）
   campaignPaused:false,   // 警長競選是否被自爆中斷（需繼續競選）
   campaignResuming:false, // 下一個白天是否繼續警長競選
@@ -466,7 +621,7 @@ const tag = (color="info") => {
 };
 
 const PHASES = { lobby:"等待加入", campaign:"警長競選", campaignVote:"投票選警長",
-  campaignPK:"平票 PK", night:"夜晚行動", day:"白天放逐投票", result:"放逐結果" };
+  campaignPK:"平票 PK", night:"夜晚行動", day:"白天放逐投票", result:"放逐結果", gameOver:"遊戲結束" };
 // Day count when sheriff campaign happened (always day 1)
 const CAMPAIGN_DAY = 1;
 
@@ -706,6 +861,21 @@ function ExileResult({ result }) {
   );
 }
 
+function GameResult({ result }) {
+  if (!result) return null;
+  const wolfWon = result.winner==="wolf";
+  return (
+    <div style={{ padding:"14px 16px", borderRadius:"var(--border-radius-md)",
+      background:wolfWon?clr.dangerBg:clr.successBg,
+      border:`1px solid ${wolfWon?clr.danger:clr.success}` }}>
+      <div style={{ fontSize:18, fontWeight:600, color:wolfWon?clr.danger:clr.success }}>
+        🏁 {wolfWon?"狼人陣營":"好人陣營"}獲勝
+      </div>
+      <div style={{ fontSize:13, color:clr.text2, marginTop:6 }}>結算原因：{result.reason}</div>
+    </div>
+  );
+}
+
 function PlayerVoteHistory({ voteHistory }) {
   const [open, setOpen] = useState(false);
   if (!voteHistory?.length) return null;
@@ -747,12 +917,14 @@ function PlayerGridGod({ room }) {
         const rc     = roleId ? ROLE_COLORS[roleId] : null;
         const isDead = Object.values(room.players||{}).find(p=>p.num===n)?.dead;
         const isSheriff = room.sheriff===n;
+        const isChangeling = Number(room.changelingWolfNum)===n;
         return (
           <div key={n} style={{ borderRadius:"var(--border-radius-md)", border:`0.5px solid ${clr.border}`,
             padding:"8px 4px", textAlign:"center", opacity:isDead?0.35:1, background:rc?rc.bg:"transparent" }}>
             <div style={{ fontSize:18, fontWeight:500, color:rc?rc.text:clr.text }}>{n}</div>
             {isSheriff && <div style={{ fontSize:10, color:clr.warn }}>⭐ 警長</div>}
             {role && <div style={{ fontSize:10, color:rc?.text||clr.text3 }}>{role.emoji}{role.label}</div>}
+            {isChangeling && <div style={{ fontSize:10, color:clr.danger }}>🃏 百變狼王</div>}
             {isDead && <div style={{ fontSize:10, color:clr.danger }}>出局</div>}
           </div>
         );
@@ -839,6 +1011,7 @@ const WITCH_SKILLS = [
   { key:"poison", label:"☠ 使用毒藥（毒人）"  },
   { key:"skip",   label:"跳過（不用藥）"       },
 ];
+const CHANGELING_FORMS = ["seer","witch","hunter","dreamer","beartrainer"];
 
 // ── NightHistory: persistent night action log ─────────────────────────────
 function NightHistory({ nightHistory, roles }) {
@@ -859,7 +1032,7 @@ function NightHistory({ nightHistory, roles }) {
           {[...(nightHistory||[])].reverse().map((entry, i) => {
             const swap = entry.swap;
             const sr = entry.check
-              ? getSeerResult(entry.check, swap, entry.roles||{}) : null;
+              ? getSeerResult(entry.check, swap, entry.roles||{},entry.changelingWolfNum) : null;
             return (
               <div key={i} style={{ padding:"10px 12px", borderRadius:"var(--border-radius-md)",
                 border:`0.5px solid ${clr.border}`, background:clr.bg2 }}>
@@ -934,6 +1107,31 @@ function NightHistory({ nightHistory, roles }) {
                   )}
                   {entry.maskKill && (
                     <div style={{ color:clr.danger }}>🎭🔪 假面擊殺：{entry.maskKill} 號</div>
+                  )}
+                  {entry.changelingWolfNum && (
+                    <div style={{ color:clr.danger }}>
+                      🃏 百變狼王：{entry.changelingWolfNum} 號（{ROLE_MAP[entry.changelingWolfForm]?.label||"未知型態"}）
+                    </div>
+                  )}
+                  {entry.changelingCharm && (
+                    <div style={{ color:clr.warn }}>🐻 百變訓熊師魅惑：{entry.changelingCharm} 號</div>
+                  )}
+                  {entry.changelingTeamKill && (
+                    <div style={{ color:clr.danger }}>🃏🔪 百變狼王擊殺：{entry.changelingTeamKill} 號</div>
+                  )}
+                  {entry.changelingSeerKill && (
+                    <div style={{ color:clr.danger }}>🔮🔪 百變預言家額外擊殺：{entry.changelingSeerKill} 號</div>
+                  )}
+                  {entry.changelingCheck && (() => {
+                    const roleId = Number(entry.changelingCheck)===Number(entry.changelingWolfNum)
+                      ? "changeling" : entry.roles?.[`p${entry.changelingCheck}`];
+                    const checkedRole = ROLE_MAP[roleId];
+                    return <div style={{ color:clr.info }}>🔮 百變預言家查驗 {entry.changelingCheck} 號：{checkedRole?.emoji} {checkedRole?.label||"身分未知"}</div>;
+                  })()}
+                  {entry.bearRoared!==undefined && (
+                    <div style={{ color:entry.bearRoared?clr.danger:clr.success }}>
+                      🐻 天亮熊叫：{entry.bearRoared?"有咆哮":"沒有咆哮"}
+                    </div>
                   )}
                   {entry.guard!=null && (
                     <div style={{ color:entry.guard==="空放"?clr.text3:clr.success }}>
@@ -1061,13 +1259,16 @@ function GodNightPanel({ room, godAction, loading }) {
 
   // Players who hold a given roleId (from room.roles, filtered to alive)
   const roleOwners = (rid) =>
-    Object.entries(room.roles||{})
+    rid==="changeling"
+      ? (room.changelingWolfNum && aliveNums.includes(Number(room.changelingWolfNum)) ? [Number(room.changelingWolfNum)] : [])
+      : Object.entries(room.roles||{})
       .filter(([,v])=>v===rid)
       .map(([k])=>Number(k.replace("p","")))
       .filter(n=>aliveNums.includes(n));
 
   const dreamerNums = roleOwners("dreamer");
-  const wolfKill = night.kill?.[0] || night.maskKill?.[0] || na.kill?.[0] || na.maskKill?.[0];
+  const wolfKill = night.kill?.[0] || night.maskKill?.[0] || night.changelingTeamKill?.[0] ||
+    na.kill?.[0] || na.maskKill?.[0] || na.changelingTeamKill?.[0];
 
   // ── Build stepData and advance ───────────────────────────────────────────
   const advanceStep = async () => {
@@ -1080,6 +1281,8 @@ function GodNightPanel({ room, godAction, loading }) {
       if (!(na.maskQuery||[])[0]) return;
       if (na.maskGiving!=="skip" && !(na.maskTarget||[])[0]) return;
     }
+    if (act?.isWitch && na.witchChoice==="poison" && !(na.witchTarget||[])[0]) return;
+    if (act?.isChangelingSelect && !na.changelingNum) return;
     setIsSaving(true);
     const stepData = {};
     if (act?.isWitch) {
@@ -1103,6 +1306,22 @@ function GodNightPanel({ room, godAction, loading }) {
       stepData.maskQuery = na.maskQuery||[];
       stepData.maskTarget = na.maskGiving==="skip" ? [] : (na.maskTarget||[]);
       stepData.maskKill = na.maskKill||[];
+    } else if (act?.isChangelingSelect) {
+      stepData.changelingWolfNum = na.changelingNum ? [na.changelingNum] : [];
+      stepData.changelingWolfForm = na.changelingForm ? [na.changelingForm] : [];
+    } else if (act?.isChangelingStatus) {
+      if (room.changelingWolfForm==="beartrainer") stepData.changelingCharm = na.changelingCharm||[];
+    } else if (act?.isVariantWolfTeam) {
+      const smallWolvesAlive = roleOwners("wolf").length>0 || (isFirstNight && (na["id_wolf"]||[]).length>0);
+      if (smallWolvesAlive) stepData.kill = na.kill||[];
+      else if (room.changelingWolfForm!=="beartrainer") stepData.changelingTeamKill = na.changelingTeamKill||[];
+    } else if (act?.isVariantSeer) {
+      if (room.changelingWolfForm==="seer") {
+        if (!isFirstNight) stepData.changelingCheck = na.changelingCheck||[];
+        if (!isFirstNight && roleOwners("wolf").length===0) stepData.changelingSeerKill = na.changelingSeerKill||[];
+      } else {
+        stepData.check = na.check||[];
+      }
     } else if (act?.isMechaAction) {
       stepData.mechaAction = na.mechaAction ? [na.mechaAction] : [];
       if (na.mechaAction==="skill") {
@@ -1136,7 +1355,7 @@ function GodNightPanel({ room, godAction, loading }) {
     // First night: identify players
     const role = ROLE_MAP[step?.roleId];
     const isWolfCamp = role?.camp === "wolf";
-    const roleIdToSave = isFirstNight ? step?.roleId : null;
+    const roleIdToSave = isFirstNight && !step?.skipFirstNightIdentify && step?.roleId!=="changeling" ? step?.roleId : null;
     const identifyNums = isFirstNight ? (na[`id_${step?.roleId}`]||[]) : [];
     if (isFirstNight && isWolfCamp) {
       stepData._wolfIdentify = {
@@ -1206,7 +1425,7 @@ function GodNightPanel({ room, godAction, loading }) {
       {(() => {
         const swap = night.swap?.length===2 ? night.swap : null;
         const sr = night.check?.[0]
-          ? getSeerResult(night.check[0], swap, room.roles||{}) : null;
+          ? getSeerResult(night.check[0], swap, room.roles||{},room.changelingWolfNum) : null;
         // 通靈師查驗結果（顯示具體身分，考慮機械狼模仿）
         const spiritTarget = night.spiritCheck?.[0];
         const spiritResult = spiritTarget ? (() => {
@@ -1227,7 +1446,9 @@ function GodNightPanel({ room, godAction, loading }) {
           night.witchSave?.[0] || night.witchPoison?.[0] || night.swap?.length===2 ||
           night.grant?.[0] || night.idol?.[0] || night.check?.[0] || night.mimic?.[0] ||
           night.spiritCheck?.[0] || night.lucky?.[0] || night.dance?.length || night.maskQuery?.[0] ||
-          night.maskTarget?.[0] || night.maskKill?.[0] || room.lonegirlTransformed || showHunterStatus;
+          night.maskTarget?.[0] || night.maskKill?.[0] || night.changelingWolfNum?.[0] ||
+          night.changelingCharm?.[0] || night.changelingTeamKill?.[0] || night.changelingSeerKill?.[0] ||
+          night.changelingCheck?.[0] || room.lonegirlTransformed || showHunterStatus;
         if (!hasAny) return null;
         return (
           <div style={{ ...card, marginBottom:12, background:clr.bg2, border:`0.5px solid ${clr.border}` }}>
@@ -1274,6 +1495,17 @@ function GodNightPanel({ room, godAction, loading }) {
               {night.maskKill?.[0] && (
                 <div style={{ color:clr.danger }}>🎭🔪 假面擊殺：{night.maskKill[0]} 號</div>
               )}
+              {(night.changelingWolfNum?.[0] || room.changelingWolfNum) && (
+                <div style={{ color:clr.danger }}>🃏 百變狼王：{night.changelingWolfNum?.[0]||room.changelingWolfNum} 號（{ROLE_MAP[night.changelingWolfForm?.[0]||room.changelingWolfForm]?.label}）</div>
+              )}
+              {night.changelingCharm?.[0] && <div style={{ color:clr.warn }}>🐻 魅惑：{night.changelingCharm[0]} 號</div>}
+              {night.changelingTeamKill?.[0] && <div style={{ color:clr.danger }}>🃏🔪 百變狼王擊殺：{night.changelingTeamKill[0]} 號</div>}
+              {night.changelingSeerKill?.[0] && <div style={{ color:clr.danger }}>🔮🔪 百變預言家額外擊殺：{night.changelingSeerKill[0]} 號</div>}
+              {night.changelingCheck?.[0] && (()=>{
+                const target=night.changelingCheck[0];
+                const roleId=Number(target)===Number(room.changelingWolfNum)?"changeling":room.roles?.[`p${target}`];
+                return <div style={{ color:clr.info }}>🔮 百變預言家查驗 {target} 號：{ROLE_MAP[roleId]?.emoji} {ROLE_MAP[roleId]?.label||"身分未知"}</div>;
+              })()}
               {night.guard?.[0]!==undefined && (
                 <div style={{ color:clr.success }}>
                   🛡 守衛守護：{night.guard[0] ? `${swapTarget(night.guard[0], swap)} 號` : "空放"}
@@ -1352,7 +1584,9 @@ function GodNightPanel({ room, godAction, loading }) {
         const invalidDance = act?.isDance && danceEligibleCount>=3 && (na.dance||[]).length!==3;
         const invalidMask = act?.isMaskAction && (!(na.maskQuery||[])[0] ||
           (na.maskGiving!=="skip" && !(na.maskTarget||[])[0]));
-        const cannotAdvance = invalidDance || invalidMask;
+        const invalidChangeling = act?.isChangelingSelect && !na.changelingNum;
+        const invalidWitch = act?.isWitch && na.witchChoice==="poison" && !(na.witchTarget||[])[0];
+        const cannotAdvance = invalidDance || invalidMask || invalidChangeling || invalidWitch;
 
         return (
           <div style={{ padding:"12px 14px", borderRadius:"var(--border-radius-md)",
@@ -1375,7 +1609,8 @@ function GodNightPanel({ room, godAction, loading }) {
             {/* ① 首夜：輸入角色玩家號碼
                 例外：機械狼「確認模仿身分」步驟（isMimicReveal）不需輸入；
                 獵人「確認開槍狀態」步驟（identifyPlayers:false 且無 act）不需重複輸入 */}
-            {isFirstNight && !act?.isMimicReveal && !(currentStep.roleId==="hunter" && !act && !currentStep.identifyPlayers) && (
+            {isFirstNight && !currentStep.skipFirstNightIdentify && currentStep.roleId!=="changeling" &&
+             !act?.isMimicReveal && !(currentStep.roleId==="hunter" && !act && !currentStep.identifyPlayers) && (
               <div style={{ marginBottom:14, padding:"8px 10px",
                 borderRadius:"var(--border-radius-md)", background:"rgba(0,0,0,0.05)" }}>
                 <div style={{ fontSize:12, fontWeight:500, color:clr.text, marginBottom:6 }}>
@@ -1463,11 +1698,12 @@ function GodNightPanel({ room, godAction, loading }) {
                 {act.isWitch && (() => {
                   // 首夜：從 UI 輸入的女巫號碼判斷（room.roles 尚未寫入）
                   // 非首夜：從 room.roles 讀取
-                  const witchNum = isFirstNight
+                  const witchNum = isFirstNight && !currentStep.skipFirstNightIdentify
                     ? (na["id_witch"]||[])[0]
                     : roleOwners("witch")[0];
                   const witchKilled = wolfKill && witchNum && Number(wolfKill) === Number(witchNum);
-                  const canSave  = wolfKill && !witchKilled && !room.witchSaveUsed;
+                  const isChangelingWitch = room.preset==="changeling_wolfking" && room.changelingWolfForm==="witch";
+                  const canSave  = !isChangelingWitch && wolfKill && !witchKilled && !room.witchSaveUsed;
                   const canPoison = !room.witchPoisonUsed;
                   const availSkills = WITCH_SKILLS.filter(s => {
                     if (s.key==="save")   return canSave;
@@ -1481,8 +1717,8 @@ function GodNightPanel({ room, godAction, loading }) {
                         {witchKilled && <span style={{ color:clr.danger, marginLeft:6 }}>（女巫本人！不可自救）</span>}
                       </div>
                       <div style={{ display:"flex", gap:8, marginBottom:6, flexWrap:"wrap" }}>
-                        <span style={{ fontSize:12, color:room.witchSaveUsed?clr.danger:clr.success }}>
-                          💊 解藥：{room.witchSaveUsed?"已用完":"剩餘 1 次"}
+                        <span style={{ fontSize:12, color:(isChangelingWitch||room.witchSaveUsed)?clr.danger:clr.success }}>
+                          💊 解藥：{isChangelingWitch?"百變女巫沒有解藥":room.witchSaveUsed?"已用完":"剩餘 1 次"}
                         </span>
                         <span style={{ fontSize:12, color:room.witchPoisonUsed?clr.danger:clr.success }}>
                           ☠ 毒藥：{room.witchPoisonUsed?"已用完":"剩餘 1 次"}
@@ -1504,6 +1740,64 @@ function GodNightPanel({ room, godAction, loading }) {
                       )}
                     </div>
                   );
+                })()}
+
+                {/* 百變狼王：首夜抽選、入隊狀態與五種變體能力 */}
+                {act.isChangelingSelect && (()=>{
+                  const candidates=Object.entries(room.roles||{})
+                    .filter(([,rid])=>CHANGELING_FORMS.includes(rid))
+                    .map(([key,rid])=>({num:Number(key.replace("p","")),rid}));
+                  const pick=()=>{
+                    if (!candidates.length) return;
+                    const chosen=candidates[Math.floor(Math.random()*candidates.length)];
+                    setNa(p=>({...p,changelingNum:chosen.num,changelingForm:chosen.rid}));
+                  };
+                  return <div>
+                    <div style={{fontSize:12,color:clr.text2,marginBottom:8}}>由五個神職位置中隨機抽出一位成為百變狼王。</div>
+                    <button onClick={pick} style={btn("danger")}>{na.changelingNum?"重新隨機抽選":"🎲 隨機抽選百變狼王"}</button>
+                    {na.changelingNum && <div style={{marginTop:10,padding:"8px 12px",borderRadius:"var(--border-radius-md)",background:clr.dangerBg,color:clr.danger,fontSize:13,fontWeight:500}}>
+                      🃏 {na.changelingNum} 號成為百變狼王（百變{ROLE_MAP[na.changelingForm]?.label}）
+                    </div>}
+                    {!candidates.length && <div style={{fontSize:12,color:clr.danger,marginTop:6}}>請先完成五個神職的號碼確認。</div>}
+                  </div>;
+                })()}
+
+                {act.isChangelingStatus && (()=>{
+                  const smallWolvesAlive=roleOwners("wolf").length>0;
+                  return <div>
+                    <div style={{padding:"8px 10px",borderRadius:"var(--border-radius-md)",background:clr.dangerBg,color:clr.danger,fontSize:13}}>
+                      🃏 {room.changelingWolfNum} 號・百變{ROLE_MAP[room.changelingWolfForm]?.label}
+                      <div style={{fontSize:12,marginTop:3}}>{smallWolvesAlive?"小狼仍在場，尚未加入狼隊刀人":"小狼已全數出局，特殊刀權已啟動"}</div>
+                    </div>
+                    {room.changelingWolfForm==="beartrainer" && <div style={{marginTop:10}}>
+                      <NightPickBtn stateKey="changelingCharm" multi={false} label="🐻 選擇本夜魅惑目標（可空放）" opts={aliveNums.filter(n=>n!==Number(room.changelingWolfNum))} na={na} setNightActions={setNightActions}/>
+                    </div>}
+                  </div>;
+                })()}
+
+                {act.isVariantWolfTeam && (()=>{
+                  const smallWolvesAlive=roleOwners("wolf").length>0 || (isFirstNight && (na["id_wolf"]||[]).length>0);
+                  if (smallWolvesAlive) return <NightPickBtn stateKey="kill" multi={false} label="三名小狼選擇狼刀目標" opts={aliveNums} na={na} setNightActions={setNightActions}/>;
+                  if (room.changelingWolfForm==="beartrainer") return <div style={{fontSize:12,color:clr.text3}}>小狼已全數出局；百變訓熊師沒有狼隊刀權。</div>;
+                  return <NightPickBtn stateKey="changelingTeamKill" multi={false} label="🃏 百變狼王選擇擊殺目標" opts={aliveNums.filter(n=>n!==Number(room.changelingWolfNum))} na={na} setNightActions={setNightActions}/>;
+                })()}
+
+                {act.isVariantSeer && (()=>{
+                  if (room.changelingWolfForm!=="seer") return <div>
+                    <NightPickBtn stateKey="check" multi={false} label="預言家查驗目標" opts={aliveNums} na={na} setNightActions={setNightActions}/>
+                    {na.check?.[0] && <div style={{marginTop:8,color:Number(na.check[0])===Number(room.changelingWolfNum)||ROLE_MAP[room.roles?.[`p${na.check[0]}`]]?.camp==="wolf"?clr.danger:clr.success,fontSize:13}}>
+                      查驗結果：{Number(na.check[0])===Number(room.changelingWolfNum)||ROLE_MAP[room.roles?.[`p${na.check[0]}`]]?.camp==="wolf"?"⚠ 狼人陣營":"✓ 好人陣營"}
+                    </div>}
+                  </div>;
+                  if (isFirstNight) return <div style={{fontSize:12,color:clr.text3}}>百變預言家首夜不能查驗。</div>;
+                  const smallWolvesDead=roleOwners("wolf").length===0;
+                  const checked=na.changelingCheck?.[0];
+                  const checkedRoleId=Number(checked)===Number(room.changelingWolfNum)?"changeling":room.roles?.[`p${checked}`];
+                  return <div>
+                    <NightPickBtn stateKey="changelingCheck" multi={false} label="🔮 查驗一名玩家的具體身分" opts={aliveNums} na={na} setNightActions={setNightActions}/>
+                    {checked && <div style={{marginTop:8,fontSize:13,color:clr.info}}>查驗結果：{ROLE_MAP[checkedRoleId]?.emoji} {ROLE_MAP[checkedRoleId]?.label||"身分未知"}</div>}
+                    {smallWolvesDead && <div style={{marginTop:10}}><NightPickBtn stateKey="changelingSeerKill" multi={false} label="🔮🔪 小狼全滅：選擇額外擊殺目標" opts={aliveNums.filter(n=>n!==Number(room.changelingWolfNum))} na={na} setNightActions={setNightActions}/></div>}
+                  </div>;
                 })()}
 
                 {/* SWAP（魔術師）：選兩人，已用過的號碼不可再選 */}
@@ -1861,7 +2155,8 @@ function GodNightPanel({ room, godAction, loading }) {
 
                 {/* 一般目標 */}
                 {!act.isWitch && !act.isSwap && !act.isGrant && !act.isGuard && !act.isDance && !act.isMaskAction &&
-                 !act.isSpiritist && !act.isMimic && !act.isMimicReveal && !act.isMechaAction && (
+                 !act.isSpiritist && !act.isMimic && !act.isMimicReveal && !act.isMechaAction &&
+                 !act.isChangelingSelect && !act.isChangelingStatus && !act.isVariantWolfTeam && !act.isVariantSeer && (
                   <div>
                     {room.preset==="masquerade" && currentStep.roleId==="wolf" && roleOwners("wolf").length===0
                       ? <div style={{ fontSize:12, color:clr.text3 }}>三名普狼均已出局，本步驟無人行動</div>
@@ -1889,12 +2184,13 @@ function GodNightPanel({ room, godAction, loading }) {
                             if ((na[`id_${rid}`]||[]).includes(realTarget)) { roleId = rid; break; }
                           }
                         }
+                        // 預言家最後行動時仍無角色紀錄者，即為尚未補寫的村民。
+                        if (!roleId) roleId = "village";
                       }
 
                       const camp    = ROLE_MAP[roleId]?.camp;
                       const isWolf  = camp === "wolf";
-                      // 非狼陣營（包含 camp 未知）一律顯示好人
-                      const unknown = !roleId;  // 完全沒有角色資訊才顯示待確認
+                      const unknown = !roleId;
                       const swapped = realTarget !== checkTarget;
 
                       return (
@@ -1940,7 +2236,8 @@ function GodNightPanel({ room, godAction, loading }) {
                 ? ((na["id_hunter"]||[])[0] || roleOwners("hunter")[0])
                 : roleOwners("hunter")[0];
               const hunterPoisoned = hunterNum && poisonReal === Number(hunterNum);
-              const canShoot = !hunterPoisoned;
+              const isChangelingHunter = room.preset==="changeling_wolfking" && room.changelingWolfForm==="hunter";
+              const canShoot = isChangelingHunter || !hunterPoisoned;
               return (
                 <div>
                   {/* 首夜：顯示自動帶入的獵人號碼 */}
@@ -1961,7 +2258,8 @@ function GodNightPanel({ room, godAction, loading }) {
                       color: canShoot ? clr.success : clr.danger }}>
                       🏹 獵人開槍狀態：{canShoot ? "✓ 可以開槍" : "✗ 被毒殺，不能開槍"}
                     </div>
-                    {hunterPoisoned && (
+                    {isChangelingHunter && <div style={{ fontSize:12, color:clr.success, marginTop:4 }}>百變獵人不論死亡原因皆可開槍。</div>}
+                    {hunterPoisoned && !isChangelingHunter && (
                       <div style={{ fontSize:12, color:clr.danger, marginTop:4 }}>
                         女巫毒藥命中獵人（{hunterNum} 號）{swap && poisonRaw !== poisonReal ? `，經魔術師互換（原目標 ${poisonRaw} 號）` : ""}
                       </div>
@@ -2017,7 +2315,7 @@ function GodNightPanel({ room, godAction, loading }) {
               );
             })()}
             {night.check?.[0] && (() => {
-              const sr = getSeerResult(night.check[0], night.swap?.length===2?night.swap:null, room.roles||{});
+              const sr = getSeerResult(night.check[0], night.swap?.length===2?night.swap:null, room.roles||{},room.changelingWolfNum);
               return (
                 <div style={{ padding:"6px 10px", borderRadius:"var(--border-radius-md)",
                   background: sr.isWolf ? clr.dangerBg : clr.successBg }}>
@@ -2142,6 +2440,10 @@ export default function App() {
       if (r.lonegirlIdol       === undefined) r.lonegirlIdol       = null;
       if (r.lonegirlTransformed=== undefined) r.lonegirlTransformed= false;
       if (r.lonegirlNewRole    === undefined) r.lonegirlNewRole    = null;
+      if (r.pendingLonegirlInheritance===undefined) r.pendingLonegirlInheritance=null;
+      if (r.gameResult===undefined) r.gameResult=null;
+      if (r.changelingWolfNum===undefined) r.changelingWolfNum=null;
+      if (r.changelingWolfForm===undefined) r.changelingWolfForm=null;
       if (!r.players)  r.players  = {};
       if (!r.night)    r.night    = { kill:[], guard:[], check:[], witchSave:[], witchPoison:[], hunter:[] };
       if (!r.campaign) r.campaign = { candidates:[], speakers:[], speakerDir:null, currentSpeaker:null, finalCandidates:[], votes:{}, pkRound:false, pkCandidates:[], result:null, votesPublished:false };
@@ -2208,6 +2510,11 @@ export default function App() {
             r.phase="campaignPK";
             r.log.push(`平票！PK：${winners.join("、")} 號`);
           }
+          // 首夜偶像死亡的覺女，必須等警長當選或警徽流失後才繼承
+          if (r.sheriff || r.sheriffBadgeLost) {
+            applyPendingLonegirlInheritance(r);
+            settleGame(r);
+          }
           break;
         }
 
@@ -2265,13 +2572,20 @@ export default function App() {
           if (r.night?.idol?.[0] && !r.lonegirlIdol) {
             r.lonegirlIdol = r.night.idol[0];
           }
+          if (r.night?.changelingWolfNum?.[0] && r.night?.changelingWolfForm?.[0]) {
+            r.changelingWolfNum = r.night.changelingWolfNum[0];
+            r.changelingWolfForm = r.night.changelingWolfForm[0];
+          }
           r.nightStep = payload.nextStep ?? 0;
           console.log("nightStep set to:", r.nightStep);
           break;
         }
 
         case "resolveNight": {
-          const deaths=computeNightDeaths(r.night, r.lastDreamTarget||null, r.roles||{});
+          const deaths=computeNightDeaths(r.night, r.lastDreamTarget||null, r.roles||{}, {
+            changelingWolfNum:r.changelingWolfNum,
+            changelingWolfForm:r.changelingWolfForm,
+          });
           // Update lastDreamTarget for next night's consecutive-dream check
           r.lastDreamTarget = r.night?.dream?.[0] || null;
           // Save magician swap to history (used numbers cannot be reused)
@@ -2300,6 +2614,7 @@ export default function App() {
             Array.from({length:12},(_,i)=>i+1).forEach(n => { if (!r.roles[`p${n}`]) r.roles[`p${n}`]="village"; });
             r.rolesRevealed=true;
           }
+          if (r.preset==="changeling_wolfking") r.night.bearRoared=computeBearRoar(r);
           r.night.resolved=true; r.night.deaths=deaths;
           // Save night snapshot to persistent history
           if (!r.nightHistory) r.nightHistory=[];
@@ -2326,12 +2641,19 @@ export default function App() {
             maskQuery:    r.night.maskQuery?.[0]    || null,
             maskTarget:   r.night.maskTarget?.[0]   || null,
             maskKill:     r.night.maskKill?.[0]     || null,
+            changelingWolfNum:  r.changelingWolfNum || null,
+            changelingWolfForm: r.changelingWolfForm || null,
+            changelingCheck:    r.night.changelingCheck?.[0] || null,
+            changelingTeamKill: r.night.changelingTeamKill?.[0] || null,
+            changelingSeerKill: r.night.changelingSeerKill?.[0] || null,
+            changelingCharm:    r.night.changelingCharm?.[0] || null,
+            bearRoared:          r.night.bearRoared,
             lonegirlTransformed: r.lonegirlTransformed || false,
             lonegirlNewRole:     r.lonegirlNewRole     || null,
             roles: { ...r.roles },
           });
 
-          // 覺醒孤獨少女：偶像夜晚死亡 → 繼承偶像角色（下一夜生效）
+          // 覺醒孤獨少女：一般夜晚於天亮前繼承；首夜延後至警徽落地
           if (r.lonegirlIdol && !r.lonegirlTransformed) {
             const idolDied = deaths.find(d=>d.num===Number(r.lonegirlIdol));
             if (idolDied) {
@@ -2342,30 +2664,13 @@ export default function App() {
                 !deaths.find(d=>d.num===Number(lonegirlNum)) &&
                 !Object.values(r.players||{}).find(p=>p.num===Number(lonegirlNum))?.dead;
               if (lonegirlNum && lonegirlAlive && idolRoleId) {
-                r.lonegirlTransformed = true;
-                r.lonegirlNewRole = idolRoleId;
-                r.roles[`p${lonegirlNum}`] = idolRoleId;
-
-                if (idolRoleId === "witch") {
-                  // 繼承女巫：解藥未用則繼承全套；已用則只有毒藥
-                  if (r.witchSaveUsed) {
-                    r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承偶像女巫身份，獲得毒藥技能（解藥已耗盡）`);
-                  } else {
-                    r.witchSaveUsed = false;
-                    r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承偶像女巫身份，獲得解藥與毒藥技能`);
-                  }
-                } else if (idolRoleId === "seer") {
-                  // 繼承預言家：直接繼承查驗能力，無特殊狀態
-                  r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承偶像預言家身份，獲得查驗技能`);
-                } else if (idolRoleId === "hunter") {
-                  // 繼承獵人：擁有開槍能力（被毒殺才失效，邏輯已在 GodNightPanel 處理）
-                  r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承偶像獵人身份，獲得開槍技能`);
-                } else if (idolRoleId === "dreamer") {
-                  // 繼承攝夢人：重置 lastDreamTarget（換人攝夢，連續攝夢計數歸零）
-                  r.lastDreamTarget = null;
-                  r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承偶像攝夢人身份，連續攝夢計數重置`);
+                if (wasFirstNight) {
+                  r.pendingLonegirlInheritance = {
+                    roleId:idolRoleId, idolNum:Number(r.lonegirlIdol), lonegirlNum:Number(lonegirlNum),
+                  };
+                  r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）的偶像首夜出局，等待警徽落地後繼承身份`);
                 } else {
-                  r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）繼承偶像（${r.lonegirlIdol} 號）${ROLE_MAP[idolRoleId]?.label||idolRoleId}身份`);
+                  inheritLonegirlRole(r,idolRoleId,Number(lonegirlNum));
                 }
               }
             }
@@ -2385,6 +2690,7 @@ export default function App() {
             r.exile.targetOptions=aliveNums();
             r.log.push(`第 ${r.dayCount} 天白天開始`);
           }
+          settleGame(r);
           break;
         }
 
@@ -2408,14 +2714,6 @@ export default function App() {
               .find(([,v])=>v==="lonegirl")?.[0]?.replace("p","");
             const lonegirlAlive = lonegirlNum &&
               !Object.values(r.players||{}).find(p=>p.num===Number(lonegirlNum))?.dead;
-            if (r.lonegirlIdol && Number(r.lonegirlIdol)===exiled &&
-                !r.lonegirlTransformed && lonegirlNum && lonegirlAlive) {
-              r.lonegirlTransformed = true;
-              r.lonegirlNewRole = "wolf";
-              r.roles[`p${lonegirlNum}`] = "wolf";
-              r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）的偶像（${exiled} 號）被放逐，孤獨少女轉變為狼人！`);
-            }
-
             if (exiledIsIdiot) {
               // 白癡首次被放逐：亮出身份，不出局，失去投票權
               r.idiotRevealed = true;
@@ -2423,7 +2721,15 @@ export default function App() {
               r.voteHistory.push({ type:"exile", label:dayLabel, candidates:targets, votes:{...votes}, tally, exiled, idiotSaved:true });
               r.phase="result"; r.log.push(`${exiled} 號（白癡）被放逐，亮出身份！白癡不出局，但失去投票權`);
             } else {
-              if (r.players[`p${exiled}`]) r.players[`p${exiled}`].dead=true;
+              if (r.lonegirlIdol && Number(r.lonegirlIdol)===exiled &&
+                  !r.lonegirlTransformed && lonegirlNum && lonegirlAlive) {
+                r.lonegirlTransformed = true;
+                r.lonegirlNewRole = "wolf";
+                r.roles[`p${lonegirlNum}`] = "wolf";
+                r.log.push(`覺醒孤獨少女（${lonegirlNum} 號）的偶像（${exiled} 號）被放逐，孤獨少女立即轉變為狼人！`);
+              }
+              if (!r.players[`p${exiled}`]) r.players[`p${exiled}`]={num:exiled,dead:false};
+              r.players[`p${exiled}`].dead=true;
               r.exile.result={ exiled, tally }; r.exile.published=true;
               r.voteHistory.push({ type:"exile", label:dayLabel, candidates:targets, votes:{...votes}, tally, exiled });
               r.phase="result"; r.log.push(`${exiled} 號被放逐出局`);
@@ -2433,7 +2739,9 @@ export default function App() {
             r.voteHistory.push({ type:"exile", label:dayLabel, candidates:targets, votes:{...votes}, tally, tied });
             r.phase="result"; r.log.push(`平票！${(tied||[]).join("、")} 號無人被放逐`);
           }
-          r.dayCount++; break;
+          r.dayCount++;
+          settleGame(r);
+          break;
         }
 
         case "transferSheriff": {
@@ -2480,11 +2788,16 @@ export default function App() {
             r.firstSpeaker = fp; r.firstSpeakerDir = fd;
             r.log.push(`連續兩次狼人自爆，警徽流失！首發：${fp} 號，方向：${fd}`);
           }
-          r.phase="night"; r.nightStep=0;
-          r.night={ kill:[], guard:[], check:[], witchSave:[], witchPoison:[], hunter:[] };
-          r.exile.votes={}; r.exile.result=null; r.exile.published=false;
-          r.exile.targetOptions=aliveNums();
-          r.log.push(`⚡ 直接進入第 ${r.dayCount} 夜`); break;
+          if (r.sheriffBadgeLost) applyPendingLonegirlInheritance(r);
+          const gameEnded = settleGame(r);
+          if (!gameEnded) {
+            r.phase="night"; r.nightStep=0;
+            r.night={ kill:[], guard:[], check:[], witchSave:[], witchPoison:[], hunter:[] };
+            r.exile.votes={}; r.exile.result=null; r.exile.published=false;
+            r.exile.targetOptions=aliveNums();
+            r.log.push(`⚡ 直接進入第 ${r.dayCount} 夜`);
+          }
+          break;
         }
       }
 
@@ -2617,6 +2930,10 @@ export default function App() {
         <span style={tag(phase==="lobby"?"gray":"info")}>{PHASES[phase]||phase}</span>
       </div>
 
+      {phase==="gameOver" && room.gameResult && (
+        <div style={card}><GameResult result={room.gameResult} /></div>
+      )}
+
       {/* LOBBY */}
       {phase==="lobby" && !room.rolesRevealed && (
         <div style={card}>
@@ -2666,6 +2983,14 @@ export default function App() {
           <span style={{ fontSize:13, fontWeight:500, color:room.night.deaths.length===0?clr.success:clr.danger }}>
             {room.night.deaths.length===0?"🌙 首夜平安，無人出局":`🌙 首夜出局：${(room.night.deaths||[]).map(d=>d.num+" 號").join("、")}`}
           </span>
+        </div>
+      )}
+      {["campaign","campaignVote","campaignPK","day","result","gameOver"].includes(phase) &&
+       room.preset==="changeling_wolfking" && room.night?.bearRoared!==undefined && (
+        <div style={{ padding:"9px 14px", borderRadius:"var(--border-radius-md)", marginBottom:12,
+          background:room.night.bearRoared?clr.dangerBg:clr.successBg,
+          color:room.night.bearRoared?clr.danger:clr.success, fontSize:13, fontWeight:500 }}>
+          🐻 訓熊師訊息：熊{room.night.bearRoared?"有咆哮":"沒有咆哮"}
         </div>
       )}
 
@@ -2840,8 +3165,20 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
         )}
       </div>
 
+      {room.preset==="changeling_wolfking" && room.night?.resolved && room.night?.bearRoared!==undefined && (
+        <div style={{ padding:"9px 14px", borderRadius:"var(--border-radius-md)", marginBottom:12,
+          background:room.night.bearRoared?clr.dangerBg:clr.successBg,
+          color:room.night.bearRoared?clr.danger:clr.success, fontSize:13, fontWeight:500 }}>
+          🐻 本次天亮：熊{room.night.bearRoared?"有咆哮":"沒有咆哮"}
+        </div>
+      )}
+
+      {room.phase==="gameOver" && room.gameResult && (
+        <div style={card}><GameResult result={room.gameResult} /></div>
+      )}
+
       {/* ── Tab bar (skip pre-game lobby; show after first night and all other phases) ── */}
-      {(room.phase !== "lobby" || room.rolesRevealed) && (
+      {room.phase!=="gameOver" && (room.phase !== "lobby" || room.rolesRevealed) && (
         <div style={{ display:"flex", gap:0, marginBottom:16, borderRadius:"var(--border-radius-md)", overflow:"hidden", border:`0.5px solid ${clr.border2}` }}>
           {[["night","🌙 夜間環節"],["day","☀ 白天環節"]].map(([t,lbl],i) => {
             const active = tab===t;
@@ -3059,7 +3396,7 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
         </div>
       )}
 
-      {tab==="day" && room.phase!=="lobby" && (
+      {tab==="day" && room.phase!=="lobby" && room.phase!=="gameOver" && (
         <div>
 
           {/* CAMPAIGN step 2 */}
