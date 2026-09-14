@@ -896,6 +896,38 @@ function GameResult({ result }) {
   );
 }
 
+function PhaseIllustration({ isNight }) {
+  return (
+    <svg width="76" height="76" viewBox="0 0 96 96" role="img"
+      aria-label={isNight?"目前為夜晚階段":"目前為白天階段"} style={{display:"block",flexShrink:0}}>
+      {isNight ? (
+        <>
+          <defs>
+            <mask id="moon-crescent-mask">
+              <rect width="96" height="96" fill="white"/>
+              <circle cx="58" cy="34" r="29" fill="black"/>
+            </mask>
+          </defs>
+          <circle cx="45" cy="47" r="31" fill="#fff3b0" mask="url(#moon-crescent-mask)"/>
+          <circle cx="77" cy="19" r="2.5" fill="#dbe7ff"/>
+          <circle cx="79" cy="53" r="1.8" fill="#dbe7ff"/>
+          <circle cx="65" cy="73" r="2.2" fill="#dbe7ff"/>
+          <path d="M16 22h8M20 18v8M78 34h6M81 31v6" stroke="#dbe7ff" strokeWidth="1.5" strokeLinecap="round"/>
+        </>
+      ) : (
+        <>
+          <circle cx="48" cy="48" r="21" fill="#f7b928"/>
+          <circle cx="48" cy="48" r="15" fill="#ffd866"/>
+          {[0,45,90,135,180,225,270,315].map(angle=>(
+            <line key={angle} x1="48" y1="10" x2="48" y2="20" stroke="#e89b13" strokeWidth="4"
+              strokeLinecap="round" transform={`rotate(${angle} 48 48)`}/>
+          ))}
+        </>
+      )}
+    </svg>
+  );
+}
+
 function PlayerVoteHistory({ voteHistory }) {
   const [open, setOpen] = useState(false);
   if (!voteHistory?.length) return null;
@@ -3258,15 +3290,20 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
   const nightPhases = ["night"];
   const dayPhases   = ["lobby","campaign","campaignVote","campaignPK","day","result"];
   const activeByPhase = nightPhases.includes(room.phase) ? "night" : "day";
+  const isNightTheme = room.phase==="night";
+  const pageBg = isNightTheme ? "#171a22" : "#ffffff";
+  const headerText = isNightTheme ? "#f7f8fc" : "#202124";
+  const headerSubtext = isNightTheme ? "#b9c0d0" : "#5f6368";
 
   return (
+    <div style={{ minHeight:"100vh", background:pageBg, transition:"background .35s ease" }}>
     <div style={{ maxWidth:560, margin:"0 auto", padding:"1.5rem 1rem" }}>
 
       {/* ── Header ── */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
         <div>
-          <h2 style={{ margin:0, color:clr.text }}>上帝視角</h2>
-          <span style={{ fontSize:13, color:clr.text2 }}>
+          <h2 style={{ margin:0, color:headerText }}>上帝視角</h2>
+          <span style={{ fontSize:13, color:headerSubtext }}>
             房號：<strong>{room.code}</strong>
             <span style={tag("gray")}>{preset.label}</span>
           </span>
@@ -3274,6 +3311,26 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
         <span style={tag(room.phase==="lobby"?"gray":room.phase==="night"?"info":"warn")}>
           {PHASES[room.phase]||room.phase}
         </span>
+      </div>
+
+      <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:16,
+        padding:"14px 18px", borderRadius:"var(--border-radius-lg)",
+        background:isNightTheme
+          ? "linear-gradient(135deg, #292e3c 0%, #1f2330 100%)"
+          : "linear-gradient(135deg, #fff8dd 0%, #fffdf5 100%)",
+        border:isNightTheme?"1px solid #41495e":"1px solid #f0d88a",
+        boxShadow:isNightTheme?"0 8px 24px rgba(0,0,0,.22)":"0 8px 24px rgba(167,125,24,.10)" }}>
+        <PhaseIllustration isNight={isNightTheme}/>
+        <div>
+          <div style={{fontSize:12,fontWeight:700,letterSpacing:".12em",
+            color:isNightTheme?"#aebbe0":"#a26700",marginBottom:4}}>目前遊戲階段</div>
+          <div style={{fontSize:22,fontWeight:700,color:isNightTheme?"#ffffff":"#5c4300"}}>
+            {isNightTheme?`第 ${room.dayCount} 夜・夜晚`:`第 ${room.dayCount} 天・白天`}
+          </div>
+          <div style={{fontSize:13,color:isNightTheme?"#c7cede":"#765f22",marginTop:3}}>
+            {PHASES[room.phase]||room.phase}
+          </div>
+        </div>
       </div>
 
       {/* ── Player grid (always visible) ── */}
@@ -3305,7 +3362,9 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
 
       {/* ── Tab bar (skip pre-game lobby; show after first night and all other phases) ── */}
       {room.phase!=="gameOver" && (room.phase !== "lobby" || room.rolesRevealed) && (
-        <div style={{ display:"flex", gap:0, marginBottom:16, borderRadius:"var(--border-radius-md)", overflow:"hidden", border:`0.5px solid ${clr.border2}` }}>
+        <div style={{ display:"flex", gap:0, marginBottom:16, borderRadius:"var(--border-radius-md)", overflow:"hidden",
+          background:isNightTheme?"#222733":"#ffffff",
+          border:isNightTheme?"1px solid #454c60":`0.5px solid ${clr.border2}` }}>
           {[["night","🌙 夜間環節"],["day","☀ 白天環節"]].map(([t,lbl],i) => {
             const active = tab===t;
             const isCurrent = activeByPhase===t;
@@ -3313,8 +3372,8 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
               <button key={t} onClick={()=>setTab(t)} style={{
                 flex:1, padding:"10px 0", fontSize:14, fontWeight:500, cursor:"pointer",
                 border:"none", borderLeft: i>0 ? `0.5px solid ${clr.border2}` : "none",
-                background: active ? clr.infoBg : "transparent",
-                color: active ? clr.info : clr.text2,
+                background: active ? (isNightTheme?"#3a4660":clr.infoBg) : "transparent",
+                color: active ? (isNightTheme?"#ffffff":clr.info) : (isNightTheme?"#b8c0d2":clr.text2),
               }}>
                 {lbl}
                 {isCurrent && !active && (
@@ -3849,6 +3908,7 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
         <div style={{ fontSize:13, color:clr.text2, marginBottom:6 }}>遊戲日誌</div>
         <Log entries={room.log} />
       </div>
+    </div>
     </div>
   );
 }
