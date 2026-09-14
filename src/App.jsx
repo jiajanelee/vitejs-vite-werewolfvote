@@ -3294,6 +3294,25 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
   const pageBg = isNightTheme ? "#171a22" : "#ffffff";
   const headerText = isNightTheme ? "#f7f8fc" : "#202124";
   const headerSubtext = isNightTheme ? "#b9c0d0" : "#5f6368";
+  // 夜間保留深色頁面氛圍，但操作卡與文字區改用固定淺色系，確保文字、圖示及狀態色清楚可讀。
+  const nightContentVars = isNightTheme ? {
+    "--color-background-primary":"#f8fafc",
+    "--color-background-secondary":"#eef2f7",
+    "--color-background-tertiary":"#e3e8f0",
+    "--color-text-primary":"#172033",
+    "--color-text-secondary":"#465268",
+    "--color-text-tertiary":"#687386",
+    "--color-border-secondary":"#c7cfda",
+    "--color-border-tertiary":"#d8dee8",
+    "--color-text-info":"#175cd3",
+    "--color-background-info":"#eaf2ff",
+    "--color-text-success":"#067647",
+    "--color-background-success":"#dcfae6",
+    "--color-text-warning":"#945300",
+    "--color-background-warning":"#fff1cf",
+    "--color-text-danger":"#b42318",
+    "--color-background-danger":"#fee4e2",
+  } : {};
 
   return (
     <div style={{ minHeight:"100vh", background:pageBg, transition:"background .35s ease" }}>
@@ -3305,10 +3324,14 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
           <h2 style={{ margin:0, color:headerText }}>上帝視角</h2>
           <span style={{ fontSize:13, color:headerSubtext }}>
             房號：<strong>{room.code}</strong>
-            <span style={tag("gray")}>{preset.label}</span>
+            <span style={isNightTheme
+              ? {...tag("gray"),background:"#2a303d",color:"#e0e5ef",border:"1px solid #454c60"}
+              : tag("gray")}>{preset.label}</span>
           </span>
         </div>
-        <span style={tag(room.phase==="lobby"?"gray":room.phase==="night"?"info":"warn")}>
+        <span style={isNightTheme
+          ? {...tag("info"),background:"#3a4660",color:"#ffffff",border:"1px solid #607091"}
+          : tag(room.phase==="lobby"?"gray":room.phase==="night"?"info":"warn")}>
           {PHASES[room.phase]||room.phase}
         </span>
       </div>
@@ -3332,6 +3355,8 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
           </div>
         </div>
       </div>
+
+      <div style={nightContentVars}>
 
       {/* ── Player grid (always visible) ── */}
       <div style={card}>
@@ -3907,6 +3932,7 @@ function GodView({ room, phase, campaign: campaignProp, exile: exileProp, sherif
       <div style={card}>
         <div style={{ fontSize:13, color:clr.text2, marginBottom:6 }}>遊戲日誌</div>
         <Log entries={room.log} />
+      </div>
       </div>
     </div>
     </div>
