@@ -15,6 +15,28 @@ function shuffle(arr) {
   return a;
 }
 
+// 上帝密碼只保存加鹽後的 PBKDF2 雜湊，不把原始密碼寫入房間資料。
+function bytesToBase64(bytes) {
+  let binary = "";
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+function createPasswordSalt() {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return bytesToBase64(bytes);
+}
+async function hashGodPassword(password, salt) {
+  const encoder = new TextEncoder();
+  const key = await globalThis.crypto.subtle.importKey(
+    "raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]
+  );
+  const derived = await globalThis.crypto.subtle.deriveBits({
+    name:"PBKDF2", salt:encoder.encode(salt), iterations:120000, hash:"SHA-256",
+  }, key, 256);
+  return bytesToBase64(new Uint8Array(derived));
+}
+
 // ── Firebase Config ───────────────────────────────────────────────────────
 // 將下方 YOUR_DATABASE_URL 換成你的 Firebase Realtime Database URL
 // 格式：https://你的專案名稱-default-rtdb.firebaseio.com
@@ -577,6 +599,9 @@ const defaultRoom = (code, presetId = "std") => ({
   gameResult:null,            // 屠邊規則的最終勝負
   changelingWolfNum:null,     // 百變狼王玩家號碼
   changelingWolfForm:null,    // 被轉化的原神職 roleId
+  godPasswordSalt:null,       // 上帝密碼使用的隨機鹽值
+  godPasswordHash:null,       // PBKDF2 雜湊；不保存原始密碼
+  godPasswordVersion:1,
   wolfBoomCount:0,        // 狼人自爆累計次數（連續兩次警徽流失）
   campaignPaused:false,   // 警長競選是否被自爆中斷（需繼續競選）
   campaignResuming:false, // 下一個白天是否繼續警長競選
@@ -2355,7 +2380,11 @@ export default function App() {
   const [room,       setRoom]       = useState(null);
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState("");
-  const [godInput,   setGodInput]   = useState({});
+  const [godInput,   setGodInput]   = useState({ selectedPreset:"std" });
+  const [createGodPassword, setCreateGodPassword] = useState("");
+  const [confirmGodPassword,setConfirmGodPassword]= useState("");
+  const [joinGodPassword,   setJoinGodPassword]   = useState("");
+  const [godLoginOpen,      setGodLoginOpen]      = useState(false);
   const [myVote,     setMyVote]     = useState(null);
   const [voted,      setVoted]      = useState(false);
   const pollRef     = useRef(null);
@@ -2384,15 +2413,26 @@ export default function App() {
 
   // ── Create / Join ───────────────────────────────────────────────────────
   async function createRoom() {
-    setLoading(true); setError("");
-    const code   = genRoomCode();
-    const presetId = godInput.selectedPreset || "std";
-    const preset = PRESETS.find(p=>p.id===presetId)||PRESETS[0];
-    const r      = defaultRoom(code, presetId);
-    r.log.push(`建立對局，版型：${preset.label}`);
-    await saveRoom(r);
-    setRoomCode(code); setIsGod(true); setRoom(r); setScreen("god");
-    setLoading(false);
+    setError("");
+    if (createGodPassword.length<4) return setError("上帝密碼至少需要 4 個字元");
+    if (createGodPassword!==confirmGodPassword) return setError("兩次輸入的上帝密碼不一致");
+    setLoading(true);
+    try {
+      const code   = genRoomCode();
+      const presetId = godInput.selectedPreset || "std";
+      const preset = PRESETS.find(p=>p.id===presetId)||PRESETS[0];
+      const r      = defaultRoom(code, presetId);
+      r.godPasswordSalt = createPasswordSalt();
+      r.godPasswordHash = await hashGodPassword(createGodPassword,r.godPasswordSalt);
+      r.log.push(`建立對局，版型：${preset.label}`);
+      await saveRoom(r);
+      setRoomCode(code); setIsGod(true); setRoom(r); setScreen("god");
+      setCreateGodPassword(""); setConfirmGodPassword("");
+    } catch (err) {
+      setError(err?.message||"建立房間失敗，請稍後再試");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function joinRoom() {
@@ -2401,6 +2441,7 @@ export default function App() {
     const code = inputCode.toUpperCase().trim();
     const r    = await loadRoom(code);
     if (!r) return setError("找不到房間，請確認房號");
+    setIsGod(false); setGodLoginOpen(false); setJoinGodPassword("");
     setRoomCode(code); setRoom(r); setScreen("join");
   }
 
@@ -2414,7 +2455,25 @@ export default function App() {
     setMyNum(n); setRoom(r); setScreen("player");
   }
 
-  async function rejoinAsGod() { setIsGod(true); setScreen("god"); }
+  async function rejoinAsGod() {
+    setError("");
+    if (!godLoginOpen) { setGodLoginOpen(true); return; }
+    if (!joinGodPassword) return setError("請輸入上帝密碼");
+    if (!room.godPasswordHash || !room.godPasswordSalt) {
+      return setError("此房間未設定上帝密碼，無法從加入頁面進入上帝視角");
+    }
+    setLoading(true);
+    try {
+      const hash = await hashGodPassword(joinGodPassword,room.godPasswordSalt);
+      if (hash!==room.godPasswordHash) return setError("上帝密碼錯誤");
+      setJoinGodPassword(""); setGodLoginOpen(false);
+      setIsGod(true); setScreen("god");
+    } catch (err) {
+      setError(err?.message||"密碼校驗失敗，請稍後再試");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // ── God actions ─────────────────────────────────────────────────────────
   async function godAction(action, payload={}) {
@@ -2852,16 +2911,39 @@ export default function App() {
       <div style={card}>
         <div style={{ fontSize:13, fontWeight:500, color:clr.text, marginBottom:10 }}>選擇版型（上帝建立房間）</div>
         <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:14 }}>
-          {PRESETS.map(p => (
-            <button key={p.id} onClick={() => setGodInput(prev=>({...prev,selectedPreset:p.id}))}
-              style={{ textAlign:"left", padding:"10px 14px", borderRadius:"var(--border-radius-md)",
-                border:godInput.selectedPreset===p.id?`1.5px solid ${clr.info}`:`0.5px solid ${clr.border2}`,
-                background:godInput.selectedPreset===p.id?clr.infoBg:"transparent",
-                color:clr.text, cursor:"pointer" }}>
-              <div style={{ fontWeight:500, fontSize:14, color:godInput.selectedPreset===p.id?clr.info:clr.text }}>{p.label}</div>
-              <div style={{ fontSize:12, color:clr.text3, marginTop:2 }}>{p.desc}</div>
-            </button>
-          ))}
+          {PRESETS.map(p => {
+            const selected=godInput.selectedPreset===p.id;
+            return (
+              <button key={p.id} aria-pressed={selected}
+                onClick={() => setGodInput(prev=>({...prev,selectedPreset:p.id}))}
+                style={{ textAlign:"left", padding:selected?"10px 12px":"10px 14px",
+                  borderRadius:"var(--border-radius-md)", position:"relative",
+                  border:selected?`2px solid ${clr.info}`:`0.5px solid ${clr.border2}`,
+                  borderLeft:selected?`5px solid ${clr.info}`:`0.5px solid ${clr.border2}`,
+                  background:selected?clr.infoBg:"transparent",
+                  boxShadow:selected?`0 0 0 1px ${clr.info}`:"none",
+                  opacity:selected?1:0.72, color:clr.text, cursor:"pointer",
+                  transform:selected?"translateX(3px)":"none",
+                  transition:"opacity .15s, transform .15s, box-shadow .15s" }}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                  <div style={{ fontWeight:selected?700:500, fontSize:14, color:selected?clr.info:clr.text }}>{p.label}</div>
+                  {selected && <span style={{fontSize:11,fontWeight:700,color:clr.info,
+                    background:clr.bg,padding:"2px 7px",borderRadius:"999px",whiteSpace:"nowrap"}}>✓ 已選擇</span>}
+                </div>
+                <div style={{ fontSize:12, color:selected?clr.text2:clr.text3, marginTop:2 }}>{p.desc}</div>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ borderTop:`0.5px solid ${clr.border}`, paddingTop:12, marginBottom:12 }}>
+          <div style={{ fontSize:13, fontWeight:500, color:clr.text, marginBottom:7 }}>設定上帝專用密碼</div>
+          <input type="password" placeholder="輸入上帝密碼（至少 4 個字元）"
+            value={createGodPassword} autoComplete="new-password"
+            onChange={e=>setCreateGodPassword(e.target.value)} style={inputStyle}/>
+          <input type="password" placeholder="再次輸入上帝密碼"
+            value={confirmGodPassword} autoComplete="new-password"
+            onChange={e=>setConfirmGodPassword(e.target.value)} style={{...inputStyle,marginBottom:4}}/>
+          <div style={{fontSize:11,color:clr.text3}}>此密碼只供日後從「加入現有對局」進入上帝視角使用。</div>
         </div>
         <button onClick={createRoom} disabled={loading||!godInput.selectedPreset}
           style={{ ...btn("primary",!godInput.selectedPreset), width:"100%", marginBottom:14, padding:12, fontSize:15 }}>
@@ -2888,8 +2970,17 @@ export default function App() {
       <p style={{ color:clr.text2, fontSize:13 }}>房號：<strong>{room.code}</strong></p>
       <div style={card}>
         <button onClick={rejoinAsGod} style={{ ...btn("warn"), width:"100%", padding:"10px 0", fontSize:14, marginBottom:14 }}>
-          以上帝身份進入
+          {godLoginOpen?"驗證密碼並進入上帝視角":"以上帝身份進入"}
         </button>
+        {godLoginOpen && (
+          <div style={{marginTop:-6,marginBottom:14,padding:"10px 12px",borderRadius:"var(--border-radius-md)",background:clr.warnBg}}>
+            <input type="password" placeholder="輸入建立房間時設定的上帝密碼"
+              value={joinGodPassword} autoComplete="current-password" autoFocus
+              onChange={e=>setJoinGodPassword(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter") rejoinAsGod();}}
+              style={{...inputStyle,marginBottom:0}}/>
+          </div>
+        )}
         <div style={{ fontSize:12, color:clr.text3, marginBottom:10, textAlign:"center" }}>— 或選擇玩家號碼 —</div>
         <PlayerGrid room={room} myNum={myNum} onSelect={selectSeat} />
         {error && <div style={{ color:clr.danger, fontSize:13, marginTop:8 }}>{error}</div>}
